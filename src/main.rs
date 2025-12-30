@@ -11,6 +11,8 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let prog = &args[0];
 
+    let use_gdb = args.iter().any(|arg| arg == "--gdb");
+
     // choose whether to start the UEFI or BIOS image
     let uefi = match args.get(1).map(|s| s.to_lowercase()) {
         Some(ref s) if s == "uefi" => true,
@@ -28,6 +30,11 @@ fn main() {
     };
 
     let mut cmd = Command::new("qemu-system-x86_64");
+    
+    if use_gdb {
+        cmd.arg("-s").arg("-S");
+    }
+    
     // print serial output to the shell
     cmd.arg("-serial").arg("mon:stdio");
     // don't display video output
