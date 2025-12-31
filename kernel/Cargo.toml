@@ -10,3 +10,4 @@ bench = false
 
 [dependencies]
 bootloader_api = "0.11.13"
+uart_16550 = "0.4.0"
