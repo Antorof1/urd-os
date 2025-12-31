@@ -12,6 +12,8 @@ fn main() {
     let prog = &args[0];
 
     let use_gdb = args.iter().any(|arg| arg == "--gdb");
+    
+    let use_display = args.iter().any(|arg| arg == "--display");
 
     // choose whether to start the UEFI or BIOS image
     let uefi = match args.get(1).map(|s| s.to_lowercase()) {
@@ -37,8 +39,13 @@ fn main() {
     
     // print serial output to the shell
     cmd.arg("-serial").arg("mon:stdio");
-    // don't display video output
-    cmd.arg("-display").arg("none");
+    
+    if use_display {
+        cmd.arg("-display").arg("gtk");
+    } else {
+        cmd.arg("-display").arg("none");
+    }
+    
     // enable the guest to exit qemu
     cmd.arg("-device")
         .arg("isa-debug-exit,iobase=0xf4,iosize=0x04");
