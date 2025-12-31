@@ -1,26 +1,27 @@
 #![no_std]
 #![no_main]
 
+pub mod console;
+
 use bootloader_api::{BootInfo, entry_point};
-use core::fmt::Write;
 use core::panic::PanicInfo;
-use uart_16550::SerialPort;
 
-fn serial() -> SerialPort {
-    const SERIAL_IO_PORT: u16 = 0x3F8;
-
-    let mut port = unsafe { SerialPort::new(SERIAL_IO_PORT) };
-    port.init();
-
-    port
-}
+use crate::console::CONSOLE;
 
 entry_point!(kernel_main);
 
 fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
-    let mut serial_port = serial();
+    if let Some(fb_struct) = boot_info.framebuffer.as_mut() {
+        CONSOLE
+            .lock()
+            .init_framebuffer(fb_struct.info(), fb_struct.buffer_mut());
 
-    writeln!(serial_port, "{boot_info:?}").unwrap();
+        CONSOLE.lock().framebuffer.as_mut().unwrap().clear_screen();
+    }
+
+    println!("Begin Operation Urd!\n\n");
+
+    println!("{boot_info:?}");
 
     loop {}
 }
