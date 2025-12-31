@@ -9,15 +9,17 @@ pub mod framebuffer;
 pub static CONSOLE: Lazy<Mutex<Console>> = Lazy::new(|| Mutex::new(Console::default()));
 
 pub struct Console {
-    pub serial: SerialPort,
-    pub framebuffer: Option<FramebufferDriver>,
+    serial: SerialPort,
+    framebuffer: Option<FramebufferDriver>,
 }
 
 impl Console {
     pub fn init_framebuffer(&mut self, info: FrameBufferInfo, buffer: &mut [u8]) {
         let bytes = unsafe { core::slice::from_raw_parts_mut(buffer.as_mut_ptr(), buffer.len()) };
 
-        let fb_driver = FramebufferDriver::new(info, bytes);
+        let mut fb_driver = FramebufferDriver::new(info, bytes);
+
+        fb_driver.clear_screen();
 
         self.framebuffer = Some(fb_driver);
     }

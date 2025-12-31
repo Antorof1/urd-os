@@ -15,8 +15,6 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         CONSOLE
             .lock()
             .init_framebuffer(fb_struct.info(), fb_struct.buffer_mut());
-
-        CONSOLE.lock().framebuffer.as_mut().unwrap().clear_screen();
     }
 
     println!("Begin Operation Urd!\n\n");
