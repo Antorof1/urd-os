@@ -21,12 +21,12 @@ pub fn init() {
 }
 
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
-    println!("Got INT3: {:?}", stack_frame);
+    println!("Got INT3: {:#?}", stack_frame);
 }
 
 extern "x86-interrupt" fn doublefault_handler(
     stack_frame: InterruptStackFrame,
     _error_code: u64,
 ) -> ! {
-    panic!("Got double fault: {:?}", stack_frame);
+    panic!("Got double fault: {:#?}", stack_frame);
 }

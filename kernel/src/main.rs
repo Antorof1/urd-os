@@ -25,7 +25,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     println!("Begin Operation Urd!\n\n");
 
-    println!("{boot_info:?}");
+    println!("{boot_info:#?}");
 
     loop {}
 }
