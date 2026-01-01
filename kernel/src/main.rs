@@ -3,6 +3,7 @@
 #![feature(abi_x86_interrupt)]
 
 pub mod console;
+pub mod gdt;
 pub mod interrupts;
 
 use bootloader_api::{BootInfo, entry_point};
@@ -19,6 +20,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
             .init_framebuffer(fb_struct.info(), fb_struct.buffer_mut());
     }
 
+    gdt::init();
     interrupts::init();
 
     println!("Begin Operation Urd!\n\n");
