@@ -1,7 +1,9 @@
 #![no_std]
 #![no_main]
+#![feature(abi_x86_interrupt)]
 
 pub mod console;
+pub mod interrupts;
 
 use bootloader_api::{BootInfo, entry_point};
 use core::panic::PanicInfo;
@@ -16,6 +18,8 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
             .lock()
             .init_framebuffer(fb_struct.info(), fb_struct.buffer_mut());
     }
+
+    interrupts::init();
 
     println!("Begin Operation Urd!\n\n");
 
