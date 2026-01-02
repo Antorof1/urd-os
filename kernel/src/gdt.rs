@@ -34,6 +34,7 @@ static GDT: Lazy<(GlobalDescriptorTable, Selectors)> = Lazy::new(|| {
     let mut gdt = GlobalDescriptorTable::new();
 
     let code_selector = gdt.append(Descriptor::kernel_code_segment());
+    gdt.append(Descriptor::kernel_data_segment());
     let tss_selector = gdt.append(Descriptor::tss_segment(&TSS));
 
     (
