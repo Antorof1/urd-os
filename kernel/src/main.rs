@@ -24,12 +24,16 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     println!("{boot_info:#?}");
 
-    loop {}
+    loop {
+        x86_64::instructions::hlt();
+    }
 }
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
 
-    loop {}
+    loop {
+        x86_64::instructions::hlt();
+    }
 }
