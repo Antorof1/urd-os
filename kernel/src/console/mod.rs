@@ -32,13 +32,15 @@ impl Console {
 pub fn _print(args: core::fmt::Arguments) {
     use core::fmt::Write;
 
-    let mut console = CONSOLE.lock();
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        let mut console = CONSOLE.lock();
 
-    let _ = console.serial.write_fmt(args);
+        let _ = console.serial.write_fmt(args);
 
-    if let Some(display) = &mut console.display {
-        let _ = display.write_fmt(args);
-    }
+        if let Some(display) = &mut console.display {
+            let _ = display.write_fmt(args);
+        }
+    });
 }
 
 #[macro_export]
