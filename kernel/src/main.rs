@@ -7,10 +7,16 @@ pub mod display;
 pub mod gdt;
 pub mod interrupts;
 
-use bootloader_api::{BootInfo, entry_point};
+use bootloader_api::{BootInfo, BootloaderConfig, config::Mapping, entry_point};
 use core::panic::PanicInfo;
 
-entry_point!(kernel_main);
+static BOOTLOADER_CONFIG: BootloaderConfig = {
+    let mut config = BootloaderConfig::new_default();
+    config.mappings.physical_memory = Some(Mapping::Dynamic);
+    config
+};
+
+entry_point!(kernel_main, config = &BOOTLOADER_CONFIG);
 
 fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     if let Some(fb_struct) = boot_info.framebuffer.as_mut() {
