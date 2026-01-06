@@ -6,6 +6,7 @@ pub mod console;
 pub mod display;
 pub mod gdt;
 pub mod interrupts;
+pub mod memory;
 
 use bootloader_api::{BootInfo, BootloaderConfig, config::Mapping, entry_point};
 use core::panic::PanicInfo;
