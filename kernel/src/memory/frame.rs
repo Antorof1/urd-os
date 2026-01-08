@@ -18,7 +18,7 @@ impl StackFrameAllocator {
         frame_count: usize,
         frame_iter: impl Iterator<Item = PhysFrame<Size4KiB>>,
     ) {
-        self.frames.reserve(frame_count);
+        self.frames.reserve(frame_count); // Overallocation just in case
         self.frames.extend(frame_iter);
     }
 }
