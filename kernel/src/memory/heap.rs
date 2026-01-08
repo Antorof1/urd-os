@@ -5,7 +5,7 @@ use x86_64::{
     },
 };
 
-use crate::memory::boot_frame::BootFrameAllocator;
+use crate::memory::{allocator::ALLOCATOR, boot_frame::BootFrameAllocator};
 
 const HEAP_START: VirtAddr = VirtAddr::new(0x7777_7777_0000);
 const HEAP_SIZE: u64 = 100 * 1024;
@@ -26,7 +26,17 @@ pub fn init_boot(
             .allocate_frame()
             .ok_or(MapToError::FrameAllocationFailed)?;
 
-        unsafe { page_mapper.map_to(page, frame, PAGE_FLAGS, frame_allocator)? };
+        unsafe {
+            page_mapper
+                .map_to(page, frame, PAGE_FLAGS, frame_allocator)?
+                .flush();
+        };
+    }
+
+    unsafe {
+        ALLOCATOR
+            .init(HEAP_START, HEAP_SIZE)
+            .map_err(|_| MapToError::FrameAllocationFailed)?;
     }
 
     Ok(())
