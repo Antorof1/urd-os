@@ -8,7 +8,7 @@ use x86_64::{
 use crate::memory::{allocator::ALLOCATOR, boot_frame::BootFrameAllocator};
 
 const HEAP_START: VirtAddr = VirtAddr::new(0x7777_7777_0000);
-const HEAP_SIZE: u64 = 100 * 1024;
+const HEAP_SIZE: u64 = 5 * 1024 * 1024;
 
 const PAGE_FLAGS: PageTableFlags = PageTableFlags::PRESENT.union(PageTableFlags::WRITABLE);
 
