@@ -14,7 +14,11 @@ use bootloader_api::{BootInfo, BootloaderConfig, config::Mapping, entry_point};
 use core::panic::PanicInfo;
 use x86_64::VirtAddr;
 
-use crate::memory::{boot_frame::BootFrameAllocator, heap, paging};
+use crate::memory::{
+    boot_frame::BootFrameAllocator,
+    frame::{PFA, initial_heap_size},
+    heap, paging,
+};
 
 static BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -34,10 +38,15 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     let phys_offset = VirtAddr::new(boot_info.physical_memory_offset.take().unwrap());
 
-    let mut frame_allocator = BootFrameAllocator::new(&boot_info.memory_regions);
+    let mut boot_frame_allocator = BootFrameAllocator::new(&boot_info.memory_regions);
     let mut page_mapper = unsafe { paging::active_mapper(phys_offset) };
 
-    heap::init_boot(&mut frame_allocator, &mut page_mapper).expect("boot heap init error");
+    let frame_count = boot_frame_allocator.frame_count();
+    let heap_size = initial_heap_size(frame_count);
+    heap::init_boot(&mut boot_frame_allocator, &mut page_mapper, heap_size)
+        .expect("boot heap init error");
+
+    PFA.lock().init(frame_count, boot_frame_allocator);
 
     println!("Begin Operation Urd!\n\n");
 

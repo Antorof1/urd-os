@@ -8,16 +8,16 @@ use x86_64::{
 use crate::memory::{allocator::ALLOCATOR, boot_frame::BootFrameAllocator};
 
 const HEAP_START: VirtAddr = VirtAddr::new(0x7777_7777_0000);
-const HEAP_SIZE: u64 = 5 * 1024 * 1024;
 
 const PAGE_FLAGS: PageTableFlags = PageTableFlags::PRESENT.union(PageTableFlags::WRITABLE);
 
 pub fn init_boot(
     frame_allocator: &mut BootFrameAllocator,
     page_mapper: &mut OffsetPageTable,
+    initial_heap_size: usize,
 ) -> Result<(), MapToError<Size4KiB>> {
     let first_page = Page::containing_address(HEAP_START);
-    let last_page = Page::containing_address(HEAP_START + HEAP_SIZE - 1u64);
+    let last_page = Page::containing_address(HEAP_START + initial_heap_size as u64 - 1u64);
 
     let pages_to_map = Page::<Size4KiB>::range_inclusive(first_page, last_page);
 
@@ -35,7 +35,7 @@ pub fn init_boot(
 
     unsafe {
         ALLOCATOR
-            .init(HEAP_START, HEAP_SIZE)
+            .init(HEAP_START, initial_heap_size as u64)
             .map_err(|_| MapToError::FrameAllocationFailed)?;
     }
 

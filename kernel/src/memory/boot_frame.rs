@@ -19,6 +19,14 @@ impl<'a> BootFrameAllocator<'a> {
             memory_offset: 0,
         }
     }
+
+    pub fn frame_count(&self) -> usize {
+        self.regions
+            .iter()
+            .filter(|r| r.kind == MemoryRegionKind::Usable)
+            .map(|r| (r.end - r.start) / 4096)
+            .sum::<u64>() as usize
+    }
 }
 
 unsafe impl<'a> FrameAllocator<Size4KiB> for BootFrameAllocator<'a> {
@@ -48,5 +56,13 @@ unsafe impl<'a> FrameAllocator<Size4KiB> for BootFrameAllocator<'a> {
 
             self.last_region += 1;
         }
+    }
+}
+
+impl<'a> Iterator for BootFrameAllocator<'a> {
+    type Item = PhysFrame;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.allocate_frame()
     }
 }
