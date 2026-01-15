@@ -35,7 +35,7 @@ impl FrameDeallocator<Size4KiB> for StackFrameAllocator {
     }
 }
 
-pub fn initial_heap_size(frame_count: usize) -> usize {
+pub const fn initial_heap_size(frame_count: usize) -> usize {
     const ADDITIONAL_BUFFER: usize = 1 * 1024 * 1024;
 
     let vec_size = frame_count * size_of::<PhysFrame>();
