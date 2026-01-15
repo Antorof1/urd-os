@@ -1,6 +1,9 @@
 use alloc::vec::Vec;
 use spin::Mutex;
-use x86_64::structures::paging::{FrameAllocator, FrameDeallocator, PhysFrame, Size4KiB};
+use x86_64::{
+    align_up,
+    structures::paging::{FrameAllocator, FrameDeallocator, PageSize, PhysFrame, Size4KiB},
+};
 
 pub static PFA: Mutex<StackFrameAllocator> = Mutex::new(StackFrameAllocator::new());
 
@@ -39,6 +42,7 @@ pub const fn initial_heap_size(frame_count: usize) -> usize {
     const ADDITIONAL_BUFFER: usize = 1 * 1024 * 1024;
 
     let vec_size = frame_count * size_of::<PhysFrame>();
+    let raw_size = vec_size + ADDITIONAL_BUFFER;
 
-    vec_size + ADDITIONAL_BUFFER
+    align_up(raw_size as u64, Size4KiB::SIZE) as usize
 }
