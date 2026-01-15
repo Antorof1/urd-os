@@ -25,11 +25,11 @@ impl LockedAllocator {
 }
 
 unsafe impl GlobalAlloc for LockedAllocator {
-    unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         interrupts::without_interrupts(|| unsafe { self.0.alloc(layout) })
     }
 
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         interrupts::without_interrupts(|| unsafe { self.0.dealloc(ptr, layout) })
     }
 
