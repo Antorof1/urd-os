@@ -18,6 +18,7 @@ use crate::memory::{
     boot_frame::BootFrameAllocator,
     frame::{PFA, initial_heap_size},
     heap, paging,
+    vmm::VMM,
 };
 
 static BOOTLOADER_CONFIG: BootloaderConfig = {
@@ -47,6 +48,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         .expect("boot heap init error");
 
     PFA.lock().init(frame_count, boot_frame_allocator);
+    VMM.lock().init(page_mapper);
 
     println!("Begin Operation Urd!\n\n");
 

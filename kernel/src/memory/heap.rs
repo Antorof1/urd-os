@@ -1,3 +1,5 @@
+use core::sync::atomic::{AtomicU64, Ordering};
+
 use x86_64::{
     VirtAddr,
     structures::paging::{
@@ -8,8 +10,11 @@ use x86_64::{
 use crate::memory::{allocator::ALLOCATOR, boot_frame::BootFrameAllocator};
 
 const HEAP_START: VirtAddr = VirtAddr::new(0x7777_7777_0000);
+pub const MIN_HEAP_GROW: u64 = 64 * 1024;
 
-const PAGE_FLAGS: PageTableFlags = PageTableFlags::PRESENT.union(PageTableFlags::WRITABLE);
+pub static HEAP_TOP: AtomicU64 = AtomicU64::new(HEAP_START.as_u64());
+
+pub const PAGE_FLAGS: PageTableFlags = PageTableFlags::PRESENT.union(PageTableFlags::WRITABLE);
 
 pub fn init_boot(
     frame_allocator: &mut BootFrameAllocator,
@@ -38,6 +43,8 @@ pub fn init_boot(
             .init(HEAP_START, initial_heap_size as u64)
             .map_err(|_| MapToError::FrameAllocationFailed)?;
     }
+
+    HEAP_TOP.fetch_add(initial_heap_size as u64, Ordering::SeqCst);
 
     Ok(())
 }
