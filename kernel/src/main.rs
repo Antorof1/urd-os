@@ -9,6 +9,7 @@ pub mod display;
 pub mod gdt;
 pub mod interrupts;
 pub mod memory;
+pub mod pit;
 pub mod task;
 
 use bootloader_api::{BootInfo, BootloaderConfig, config::Mapping, entry_point};
@@ -38,6 +39,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         display::init(fb_struct.info(), fb_struct.buffer_mut());
     }
 
+    pit::init();
     gdt::init();
     interrupts::init();
 
