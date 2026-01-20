@@ -7,6 +7,7 @@ use core::{
 use alloc::boxed::Box;
 
 pub mod executor;
+pub mod timer;
 pub mod waker;
 
 pub struct Task {

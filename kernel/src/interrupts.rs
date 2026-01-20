@@ -2,7 +2,7 @@ use pic8259::ChainedPics;
 use spin::{Lazy, Mutex};
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 
-use crate::{gdt::DOUBLE_FAULT_IST_INDEX, println};
+use crate::{gdt::DOUBLE_FAULT_IST_INDEX, println, task::timer::on_timer_tick};
 
 const PIC_MASTER_OFFSET: u8 = 32;
 const PIC_SLAVE_OFFSET: u8 = PIC_MASTER_OFFSET + 8;
@@ -71,6 +71,8 @@ extern "x86-interrupt" fn doublefault_handler(
 }
 
 extern "x86-interrupt" fn timer_handler(_stack_frame: InterruptStackFrame) {
+    on_timer_tick();
+
     unsafe {
         PICS.lock()
             .notify_end_of_interrupt(IRQIndex::Timer.with_offset());

@@ -13,6 +13,7 @@ bootloader_api = "0.11.13"
 crossbeam-queue = { version = "0.3.12", default-features = false, features = ["alloc"] }
 embedded-graphics = "0.8.1"
 font8x8 = { version = "0.3.1", default-features = false }
+futures-util = { version = "0.3.31", default-features = false, features = ["alloc"] }
 pic8259 = "0.11.0"
 spin = "0.10.0"
 talc = "4.4.3"

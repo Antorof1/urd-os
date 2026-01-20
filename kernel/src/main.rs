@@ -23,7 +23,7 @@ use crate::{
         heap, paging,
         vmm::VMM,
     },
-    task::executor::Executor,
+    task::{Task, executor::Executor, timer},
 };
 
 static BOOTLOADER_CONFIG: BootloaderConfig = {
@@ -61,6 +61,8 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     println!("{boot_info:#?}");
 
     let mut task_executor = Executor::new();
+
+    task_executor.spawn(Task::new(timer::task()));
 
     task_executor.run();
 }
