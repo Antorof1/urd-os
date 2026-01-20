@@ -9,16 +9,20 @@ pub mod display;
 pub mod gdt;
 pub mod interrupts;
 pub mod memory;
+pub mod task;
 
 use bootloader_api::{BootInfo, BootloaderConfig, config::Mapping, entry_point};
 use core::panic::PanicInfo;
 use x86_64::VirtAddr;
 
-use crate::memory::{
-    boot_frame::BootFrameAllocator,
-    frame::{PFA, initial_heap_size},
-    heap, paging,
-    vmm::VMM,
+use crate::{
+    memory::{
+        boot_frame::BootFrameAllocator,
+        frame::{PFA, initial_heap_size},
+        heap, paging,
+        vmm::VMM,
+    },
+    task::executor::Executor,
 };
 
 static BOOTLOADER_CONFIG: BootloaderConfig = {
@@ -54,9 +58,9 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     println!("{boot_info:#?}");
 
-    loop {
-        x86_64::instructions::hlt();
-    }
+    let mut task_executor = Executor::new();
+
+    task_executor.run();
 }
 
 #[panic_handler]
