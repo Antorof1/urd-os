@@ -1,6 +1,9 @@
 use pic8259::ChainedPics;
 use spin::{Lazy, Mutex};
-use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
+use x86_64::{
+    registers::control::Cr2,
+    structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
+};
 
 use crate::{gdt::DOUBLE_FAULT_IST_INDEX, println, task::timer::on_timer_tick};
 
@@ -29,6 +32,8 @@ static IDT: Lazy<InterruptDescriptorTable> = Lazy::new(|| {
     let mut idt = InterruptDescriptorTable::new();
 
     idt.breakpoint.set_handler_fn(breakpoint_handler);
+    idt.general_protection_fault.set_handler_fn(gpf_handler);
+    idt.page_fault.set_handler_fn(pagefault_handler);
     unsafe {
         idt.double_fault
             .set_handler_fn(doublefault_handler)
@@ -60,14 +65,38 @@ pub fn init() {
 }
 
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
-    println!("Got INT3: {:#?}", stack_frame);
+    println!("EXCEPTION: BREAKPOINT\n{:#?}", stack_frame);
+}
+
+extern "x86-interrupt" fn gpf_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+    panic!(
+        "EXCEPTION: GENERAL PROTECTION FAULT\n\
+        Error Code: {:#x}\n\
+        {:#?}",
+        error_code, stack_frame
+    );
+}
+
+extern "x86-interrupt" fn pagefault_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: PageFaultErrorCode,
+) {
+    panic!(
+        "EXCEPTION: PAGE FAULT\n\
+        Accessed Address: {:?}\n\
+        Error Code: {:?}\n\
+        {:#?}",
+        Cr2::read(),
+        error_code,
+        stack_frame
+    );
 }
 
 extern "x86-interrupt" fn doublefault_handler(
     stack_frame: InterruptStackFrame,
     _error_code: u64,
 ) -> ! {
-    panic!("Got double fault: {:#?}", stack_frame);
+    panic!("EXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
 }
 
 extern "x86-interrupt" fn timer_handler(_stack_frame: InterruptStackFrame) {
