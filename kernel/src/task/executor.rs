@@ -22,7 +22,7 @@ impl Executor {
         let task_id = task.id;
 
         if self.tasks.insert(task_id, task).is_some() {
-            panic!("NEXT_ID overflow");
+            panic!("Task NEXT_ID overflow");
         }
 
         self.task_queue

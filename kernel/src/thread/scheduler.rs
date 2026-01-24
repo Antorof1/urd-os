@@ -1,0 +1,115 @@
+use alloc::collections::btree_map::BTreeMap;
+use crossbeam_queue::ArrayQueue;
+use spin::Mutex;
+use x86_64::VirtAddr;
+
+use crate::thread::{
+    Thread, ThreadId,
+    context::{restore_context, switch_context},
+};
+
+pub static SCHEDULER: Mutex<Scheduler> = Mutex::new(Scheduler::new());
+
+pub struct Scheduler {
+    threads: BTreeMap<ThreadId, Thread>,
+    thread_queue: Option<ArrayQueue<ThreadId>>,
+    current_thread_id: Option<ThreadId>,
+    idle_thread_id: Option<ThreadId>,
+}
+
+impl Scheduler {
+    pub const fn new() -> Self {
+        Self {
+            threads: BTreeMap::new(),
+            thread_queue: None,
+            current_thread_id: None,
+            idle_thread_id: None,
+        }
+    }
+
+    pub fn init(&mut self) {
+        self.thread_queue = Some(ArrayQueue::new(1024));
+
+        let idle_thread = Thread::new_idle();
+        let idle_thread_id = idle_thread.id();
+
+        self.threads.insert(idle_thread_id, idle_thread);
+
+        self.idle_thread_id = Some(idle_thread_id);
+    }
+
+    pub fn run(&mut self) -> ! {
+        let idle_id = self.idle_thread_id.expect("Scheduler called before init()");
+
+        self.current_thread_id = Some(idle_id);
+
+        let idle_thread = self.threads.get(&idle_id).unwrap();
+
+        unsafe {
+            SCHEDULER.force_unlock();
+
+            restore_context(idle_thread.stack_ptr());
+        }
+        unreachable!()
+    }
+
+    pub fn spawn(&mut self, thread: Thread) {
+        let thread_id = thread.id();
+
+        if self.threads.insert(thread_id, thread).is_some() {
+            panic!("Thread NEXT_ID overflow");
+        }
+
+        self.thread_queue_mut()
+            .push(thread_id)
+            .expect("Scheduler queue is full");
+    }
+
+    pub fn schedule(&mut self) -> Option<(*mut VirtAddr, VirtAddr)> {
+        let next_id = match self.thread_queue_mut().pop() {
+            Some(id) => id,
+            None => return None,
+        };
+
+        let current_id = self
+            .current_thread_id
+            .expect("Scheduler called before run()");
+
+        if current_id == next_id {
+            return None;
+        }
+
+        unsafe {
+            let threads_ptr = &mut self.threads as *mut BTreeMap<ThreadId, Thread>;
+
+            let current_thread = (*threads_ptr).get_mut(&current_id).unwrap();
+            let next_thread = (*threads_ptr).get_mut(&next_id).unwrap();
+
+            if current_id != self.idle_thread_id.unwrap() {
+                self.thread_queue_mut()
+                    .push(current_id)
+                    .expect("Scheduler queue is full");
+            }
+
+            self.current_thread_id = Some(next_id);
+
+            Some((current_thread.stack_ptr_mut(), next_thread.stack_ptr()))
+        }
+    }
+
+    fn thread_queue_mut(&mut self) -> &mut ArrayQueue<ThreadId> {
+        self.thread_queue
+            .as_mut()
+            .expect("Scheduler called before init()")
+    }
+}
+
+pub fn schedule() {
+    let context_ptrs = SCHEDULER.try_lock().and_then(|mut s| s.schedule());
+
+    if let Some((current_context_ptr, next_context_ptr)) = context_ptrs {
+        unsafe {
+            switch_context(current_context_ptr, next_context_ptr);
+        }
+    }
+}

@@ -11,6 +11,7 @@ pub mod interrupts;
 pub mod memory;
 pub mod pit;
 pub mod task;
+pub mod thread;
 
 use bootloader_api::{BootInfo, BootloaderConfig, config::Mapping, entry_point};
 use core::panic::PanicInfo;
@@ -23,7 +24,7 @@ use crate::{
         heap, paging,
         vmm::VMM,
     },
-    task::{Task, executor::Executor, timer},
+    thread::{Thread, scheduler::SCHEDULER},
 };
 
 static BOOTLOADER_CONFIG: BootloaderConfig = {
@@ -55,16 +56,19 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     PFA.lock().init(frame_count, boot_frame_allocator);
     VMM.lock().init(page_mapper);
+    SCHEDULER.lock().init();
 
-    println!("Begin Operation Urd!\n\n");
+    SCHEDULER.lock().spawn(Thread::new(|| {
+        println!("Task 1");
+        loop {}
+    }));
 
-    println!("{boot_info:#?}");
+    SCHEDULER.lock().spawn(Thread::new(|| {
+        println!("Task 2");
+        loop {}
+    }));
 
-    let mut task_executor = Executor::new();
-
-    task_executor.spawn(Task::new(timer::task()));
-
-    task_executor.run();
+    SCHEDULER.lock().run();
 }
 
 #[panic_handler]
