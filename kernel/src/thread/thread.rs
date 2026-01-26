@@ -3,7 +3,7 @@ use core::sync::atomic::{AtomicU64, Ordering};
 use alloc::boxed::Box;
 use x86_64::VirtAddr;
 
-use crate::thread::context::ContextFrame;
+use crate::thread::{self, context::ContextFrame};
 
 const STACK_SIZE: usize = 16384;
 
@@ -15,16 +15,18 @@ pub struct Thread {
 
 impl Thread {
     pub fn new(entry: fn()) -> Self {
-        let mut stack = Box::new([0; STACK_SIZE]);
-
-        let stack_top = unsafe { stack.as_mut_ptr().add(STACK_SIZE) as u64 };
-
-        let context_size = size_of::<ContextFrame>() as u64;
-        let stack_ptr = stack_top - context_size;
+        let mut stack = Box::new([0u8; STACK_SIZE]);
 
         unsafe {
-            let context_ptr = stack_ptr as *mut ContextFrame;
+            let stack_top = stack.as_mut_ptr().add(STACK_SIZE);
 
+            let ret_addr_ptr = stack_top.sub(8);
+            core::ptr::write(ret_addr_ptr as *mut u64, thread::exit as *const () as u64);
+
+            let context_size = size_of::<ContextFrame>();
+            let stack_ptr = ret_addr_ptr.sub(context_size);
+
+            let context_ptr = stack_ptr as *mut ContextFrame;
             core::ptr::write_bytes(context_ptr, 0, 1);
 
             let context = &mut *context_ptr;
@@ -32,14 +34,14 @@ impl Thread {
             context.rip = entry as u64;
             context.cs = 0x8;
             context.rflags = 0x202;
-            context.rsp = stack_top;
+            context.rsp = ret_addr_ptr as u64;
             context.ss = 0x10;
-        }
 
-        Self {
-            id: ThreadId::new(),
-            stack,
-            stack_ptr: VirtAddr::new(stack_ptr),
+            Self {
+                id: ThreadId::new(),
+                stack,
+                stack_ptr: VirtAddr::from_ptr(stack_ptr),
+            }
         }
     }
 

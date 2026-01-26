@@ -60,12 +60,10 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     SCHEDULER.lock().spawn(Thread::new(|| {
         println!("Task 1");
-        loop {}
     }));
 
     SCHEDULER.lock().spawn(Thread::new(|| {
         println!("Task 2");
-        thread::exit();
     }));
 
     SCHEDULER.lock().run();
