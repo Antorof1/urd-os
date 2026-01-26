@@ -2,6 +2,8 @@ use core::arch::naked_asm;
 
 use x86_64::VirtAddr;
 
+use crate::thread::schedule;
+
 #[repr(C)]
 #[derive(Debug, Default)]
 pub struct ContextFrame {
@@ -83,4 +85,21 @@ pub unsafe extern "C" fn switch_to_context(target_stack: VirtAddr) {
     // rdi -> target stack address
 
     naked_asm!("mov rsp, rdi", restore_context!(), "iretq");
+}
+
+pub extern "C" fn try_switch_threads(current_frame: *mut ContextFrame) -> *mut ContextFrame {
+    // schedule() returns:
+    // 1. A pointer to 'Thread::stack_ptr' of the current thread
+    // 2. The 'Thread::stack_ptr' of the next thread
+    if let Some((old_stack_ptr, next_stack)) = schedule() {
+        unsafe {
+            // Save the current stack pointer into old thread's 'Thread::stack_ptr'
+            *old_stack_ptr = VirtAddr::from_ptr(current_frame);
+        }
+
+        return next_stack.as_mut_ptr();
+    }
+
+    // If no switch needed, return the same stack pointer we started with
+    current_frame
 }

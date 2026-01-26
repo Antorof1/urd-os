@@ -12,7 +12,7 @@ use crate::{
     gdt::DOUBLE_FAULT_IST_INDEX,
     println, restore_context, save_context,
     task::timer::on_timer_tick,
-    thread::{context::ContextFrame, schedule},
+    thread::context::{ContextFrame, try_switch_threads},
 };
 
 const PIC_MASTER_OFFSET: u8 = 32;
@@ -135,18 +135,5 @@ extern "C" fn timer_handler_inner(current_frame: *mut ContextFrame) -> *mut Cont
 
     on_timer_tick();
 
-    // schedule() returns:
-    // 1. A pointer to 'Thread::stack_ptr' of the current thread
-    // 2. The 'Thread::stack_ptr' of the next thread
-    if let Some((old_stack_ptr, next_stack)) = schedule() {
-        unsafe {
-            // Save the current stack pointer into old thread's 'Thread::stack_ptr'
-            *old_stack_ptr = VirtAddr::from_ptr(current_frame);
-        }
-
-        return next_stack.as_mut_ptr();
-    }
-
-    // If no switch needed, return the same stack pointer we started with
-    current_frame
+    try_switch_threads(current_frame)
 }
