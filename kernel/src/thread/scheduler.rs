@@ -77,10 +77,7 @@ impl Scheduler {
             self.threads.remove(&id).unwrap();
         }
 
-        let next_id = match self.thread_queue_mut().pop() {
-            Some(id) => id,
-            None => return None,
-        };
+        let next_id = self.next_thread_id();
 
         let current_id = self
             .current_thread_id
@@ -130,11 +127,7 @@ impl Scheduler {
                 .push(current_id)
                 .expect("Dead threads queue is full");
 
-            let next_id = self
-                .thread_queue_mut()
-                .pop()
-                .or(self.idle_thread_id)
-                .unwrap();
+            let next_id = self.next_thread_id();
 
             self.current_thread_id = Some(next_id);
 
@@ -147,6 +140,13 @@ impl Scheduler {
             }
         });
         unreachable!();
+    }
+
+    fn next_thread_id(&mut self) -> ThreadId {
+        self.thread_queue_mut()
+            .pop()
+            .or(self.idle_thread_id)
+            .unwrap()
     }
 
     fn thread_queue_mut(&mut self) -> &mut ArrayQueue<ThreadId> {
