@@ -9,6 +9,7 @@ const STACK_SIZE: usize = 16384;
 
 pub struct Thread {
     id: ThreadId,
+    state: ThreadState,
     stack: Box<[u8; STACK_SIZE]>, // map to real frames instead of kernel heap
     stack_ptr: VirtAddr,
 }
@@ -39,6 +40,7 @@ impl Thread {
 
             Self {
                 id: ThreadId::new(),
+                state: ThreadState::New,
                 stack,
                 stack_ptr: VirtAddr::from_ptr(stack_ptr),
             }
@@ -64,6 +66,22 @@ impl Thread {
     pub fn stack_ptr_mut(&mut self) -> &mut VirtAddr {
         &mut self.stack_ptr
     }
+
+    pub fn set_ready(&mut self) {
+        self.state = ThreadState::Ready;
+    }
+
+    pub fn set_running(&mut self) {
+        self.state = ThreadState::Running;
+    }
+
+    pub fn set_blocked(&mut self) {
+        self.state = ThreadState::Blocked;
+    }
+
+    pub fn set_dead(&mut self) {
+        self.state = ThreadState::Dead;
+    }
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
@@ -75,4 +93,13 @@ impl ThreadId {
 
         Self(NEXT_ID.fetch_add(1, Ordering::Relaxed))
     }
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum ThreadState {
+    New,
+    Ready,
+    Running,
+    Blocked,
+    Dead,
 }
