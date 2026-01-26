@@ -10,6 +10,7 @@ pub static SCHEDULER: Mutex<Scheduler> = Mutex::new(Scheduler::new());
 pub struct Scheduler {
     threads: BTreeMap<ThreadId, Thread>,
     thread_queue: Option<ArrayQueue<ThreadId>>,
+    dead_threads: Option<ArrayQueue<ThreadId>>,
     current_thread_id: Option<ThreadId>,
     idle_thread_id: Option<ThreadId>,
 }
@@ -19,6 +20,7 @@ impl Scheduler {
         Self {
             threads: BTreeMap::new(),
             thread_queue: None,
+            dead_threads: None,
             current_thread_id: None,
             idle_thread_id: None,
         }
@@ -26,6 +28,7 @@ impl Scheduler {
 
     pub fn init(&mut self) {
         self.thread_queue = Some(ArrayQueue::new(1024));
+        self.dead_threads = Some(ArrayQueue::new(1024));
 
         let idle_thread = Thread::new_idle();
         let idle_thread_id = idle_thread.id();
@@ -50,8 +53,10 @@ impl Scheduler {
         unreachable!()
     }
 
-    pub fn spawn(&mut self, thread: Thread) {
+    pub fn spawn(&mut self, mut thread: Thread) {
         let thread_id = thread.id();
+
+        thread.set_ready();
 
         if self.threads.insert(thread_id, thread).is_some() {
             panic!("Thread NEXT_ID overflow");
@@ -63,6 +68,15 @@ impl Scheduler {
     }
 
     pub fn schedule(&mut self) -> Option<(*mut VirtAddr, VirtAddr)> {
+        let dead_threads = self
+            .dead_threads
+            .as_mut()
+            .expect("Scheduler called before init()");
+
+        while let Some(id) = dead_threads.pop() {
+            self.threads.remove(&id).unwrap();
+        }
+
         let next_id = match self.thread_queue_mut().pop() {
             Some(id) => id,
             None => return None,
@@ -88,6 +102,9 @@ impl Scheduler {
                     .expect("Scheduler queue is full");
             }
 
+            current_thread.set_ready();
+            next_thread.set_running();
+
             self.current_thread_id = Some(next_id);
 
             Some((current_thread.stack_ptr_mut(), next_thread.stack_ptr()))
@@ -104,7 +121,14 @@ impl Scheduler {
                 panic!("Cannot exit idle thread");
             }
 
-            self.threads.remove(&current_id);
+            let current_thread = self.threads.get_mut(&current_id).unwrap();
+            current_thread.set_dead();
+
+            self.dead_threads
+                .as_mut()
+                .unwrap()
+                .push(current_id)
+                .expect("Dead threads queue is full");
 
             let next_id = self
                 .thread_queue_mut()
