@@ -3,7 +3,7 @@ use crossbeam_queue::ArrayQueue;
 use spin::Mutex;
 use x86_64::VirtAddr;
 
-use crate::thread::{Thread, ThreadId, context::restore_context};
+use crate::thread::{Thread, ThreadId, context::switch_to_context};
 
 pub static SCHEDULER: Mutex<Scheduler> = Mutex::new(Scheduler::new());
 
@@ -45,7 +45,7 @@ impl Scheduler {
         unsafe {
             SCHEDULER.force_unlock();
 
-            restore_context(idle_thread.stack_ptr());
+            switch_to_context(idle_thread.stack_ptr());
         }
         unreachable!()
     }

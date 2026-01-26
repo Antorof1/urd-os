@@ -28,6 +28,7 @@ pub struct ContextFrame {
     pub ss: u64,
 }
 
+#[macro_export]
 macro_rules! save_context {
     () => {
         concat!(
@@ -52,6 +53,7 @@ macro_rules! save_context {
     };
 }
 
+#[macro_export]
 macro_rules! restore_context {
     () => {
         concat!(
@@ -77,44 +79,7 @@ macro_rules! restore_context {
 }
 
 #[unsafe(naked)]
-pub unsafe extern "C" fn switch_context(current_stack: *mut VirtAddr, target_stack: VirtAddr) {
-    // rdi -> pointer to current stack address
-    // rsi -> target stack address
-
-    naked_asm!(
-        // Save RIP
-        "mov rax, [rsp]",
-        // Save RSP
-        "lea rdx, [rsp + 8]",
-        // Save RFLAGS
-        "pushfq",
-        "pop rcx",
-        // Memory for those registers
-        "sub rsp, 32",
-        // SS
-        "mov r8, ss",
-        "mov [rsp + 32], r8",
-        // RSP
-        "mov [rsp + 24], rdx",
-        // RFLAGS
-        "mov [rsp + 16], rcx",
-        // CS
-        "mov r8, cs",
-        "mov [rsp + 8], r8",
-        // RIP
-        "mov [rsp], rax",
-        save_context!(),
-        // Save old stack pointer
-        "mov [rdi], rsp",
-        // Load new stack pointer
-        "mov rsp, rsi",
-        restore_context!(),
-        "iretq"
-    );
-}
-
-#[unsafe(naked)]
-pub unsafe extern "C" fn restore_context(target_stack: VirtAddr) {
+pub unsafe extern "C" fn switch_to_context(target_stack: VirtAddr) {
     // rdi -> target stack address
 
     naked_asm!("mov rsp, rdi", restore_context!(), "iretq");

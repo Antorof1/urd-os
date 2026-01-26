@@ -3,15 +3,10 @@ pub mod scheduler;
 pub mod thread;
 
 pub use thread::{Thread, ThreadId};
+use x86_64::VirtAddr;
 
-use crate::thread::{context::switch_context, scheduler::SCHEDULER};
+use crate::thread::scheduler::SCHEDULER;
 
-pub fn schedule() {
-    let context_ptrs = SCHEDULER.try_lock().and_then(|mut s| s.schedule());
-
-    if let Some((current_context_ptr, next_context_ptr)) = context_ptrs {
-        unsafe {
-            switch_context(current_context_ptr, next_context_ptr);
-        }
-    }
+pub fn schedule() -> Option<(*mut VirtAddr, VirtAddr)> {
+    SCHEDULER.try_lock().and_then(|mut s| s.schedule())
 }
