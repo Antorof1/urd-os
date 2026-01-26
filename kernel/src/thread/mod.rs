@@ -10,3 +10,7 @@ use crate::thread::scheduler::SCHEDULER;
 pub fn schedule() -> Option<(*mut VirtAddr, VirtAddr)> {
     SCHEDULER.try_lock().and_then(|mut s| s.schedule())
 }
+
+pub fn exit() -> ! {
+    SCHEDULER.lock().exit_current_thread();
+}

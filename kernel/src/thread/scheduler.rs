@@ -1,7 +1,7 @@
 use alloc::collections::btree_map::BTreeMap;
 use crossbeam_queue::ArrayQueue;
 use spin::Mutex;
-use x86_64::VirtAddr;
+use x86_64::{VirtAddr, instructions::interrupts};
 
 use crate::thread::{Thread, ThreadId, context::switch_to_context};
 
@@ -92,6 +92,37 @@ impl Scheduler {
 
             Some((current_thread.stack_ptr_mut(), next_thread.stack_ptr()))
         }
+    }
+
+    pub fn exit_current_thread(&mut self) -> ! {
+        interrupts::without_interrupts(|| {
+            let current_id = self
+                .current_thread_id
+                .expect("Scheduler called before run()");
+
+            if Some(current_id) == self.idle_thread_id {
+                panic!("Cannot exit idle thread");
+            }
+
+            self.threads.remove(&current_id);
+
+            let next_id = self
+                .thread_queue_mut()
+                .pop()
+                .or(self.idle_thread_id)
+                .unwrap();
+
+            self.current_thread_id = Some(next_id);
+
+            let next_thread = self.threads.get(&next_id).unwrap();
+
+            unsafe {
+                SCHEDULER.force_unlock();
+
+                switch_to_context(next_thread.stack_ptr());
+            }
+        });
+        unreachable!();
     }
 
     fn thread_queue_mut(&mut self) -> &mut ArrayQueue<ThreadId> {
