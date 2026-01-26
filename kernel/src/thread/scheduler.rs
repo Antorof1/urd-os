@@ -3,10 +3,7 @@ use crossbeam_queue::ArrayQueue;
 use spin::Mutex;
 use x86_64::VirtAddr;
 
-use crate::thread::{
-    Thread, ThreadId,
-    context::{restore_context, switch_context},
-};
+use crate::thread::{Thread, ThreadId, context::restore_context};
 
 pub static SCHEDULER: Mutex<Scheduler> = Mutex::new(Scheduler::new());
 
@@ -101,15 +98,5 @@ impl Scheduler {
         self.thread_queue
             .as_mut()
             .expect("Scheduler called before init()")
-    }
-}
-
-pub fn schedule() {
-    let context_ptrs = SCHEDULER.try_lock().and_then(|mut s| s.schedule());
-
-    if let Some((current_context_ptr, next_context_ptr)) = context_ptrs {
-        unsafe {
-            switch_context(current_context_ptr, next_context_ptr);
-        }
     }
 }

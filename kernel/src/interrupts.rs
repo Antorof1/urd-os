@@ -5,9 +5,7 @@ use x86_64::{
     structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
 };
 
-use crate::{
-    gdt::DOUBLE_FAULT_IST_INDEX, println, task::timer::on_timer_tick, thread::scheduler::schedule,
-};
+use crate::{gdt::DOUBLE_FAULT_IST_INDEX, println, task::timer::on_timer_tick, thread::schedule};
 
 const PIC_MASTER_OFFSET: u8 = 32;
 const PIC_SLAVE_OFFSET: u8 = PIC_MASTER_OFFSET + 8;
