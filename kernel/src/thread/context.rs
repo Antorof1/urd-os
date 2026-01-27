@@ -2,32 +2,17 @@ use core::arch::naked_asm;
 
 use x86_64::VirtAddr;
 
-use crate::thread::schedule;
-
 #[repr(C)]
 #[derive(Debug, Default)]
-pub struct ContextFrame {
+pub struct Context {
     pub r15: u64,
     pub r14: u64,
     pub r13: u64,
     pub r12: u64,
-    pub r11: u64,
-    pub r10: u64,
-    pub r9: u64,
-    pub r8: u64,
     pub rbp: u64,
-    pub rdi: u64,
-    pub rsi: u64,
-    pub rdx: u64,
-    pub rcx: u64,
     pub rbx: u64,
-    pub rax: u64,
 
     pub rip: u64,
-    pub cs: u64,
-    pub rflags: u64,
-    pub rsp: u64,
-    pub ss: u64,
 }
 
 #[macro_export]
@@ -35,17 +20,8 @@ macro_rules! save_context {
     () => {
         concat!(
             r#"
-			push rax
 			push rbx
-			push rcx
-			push rdx
-			push rsi
-			push rdi
 			push rbp
-			push r8
-			push r9
-			push r10
-			push r11
 			push r12
 			push r13
 			push r14
@@ -64,17 +40,8 @@ macro_rules! restore_context {
 			pop r14
 			pop r13
 			pop r12
-			pop r11
-			pop r10
-			pop r9
-			pop r8
 			pop rbp
-			pop rdi
-			pop rsi
-			pop rdx
-			pop rcx
 			pop rbx
-			pop rax
 			"#
         )
     };
@@ -82,24 +49,16 @@ macro_rules! restore_context {
 
 #[unsafe(naked)]
 pub unsafe extern "C" fn switch_to_context(target_stack: VirtAddr) {
-    // rdi -> target stack address
-
-    naked_asm!("mov rsp, rdi", restore_context!(), "iretq");
+    naked_asm!("mov rsp, rdi", restore_context!(), "ret");
 }
 
-pub extern "C" fn try_switch_threads(current_frame: *mut ContextFrame) -> *mut ContextFrame {
-    // schedule() returns:
-    // 1. A pointer to 'Thread::stack_ptr' of the current thread
-    // 2. The 'Thread::stack_ptr' of the next thread
-    if let Some((old_stack_ptr, next_stack)) = schedule() {
-        unsafe {
-            // Save the current stack pointer into old thread's 'Thread::stack_ptr'
-            *old_stack_ptr = VirtAddr::from_ptr(current_frame);
-        }
-
-        return next_stack.as_mut_ptr();
-    }
-
-    // If no switch needed, return the same stack pointer we started with
-    current_frame
+#[unsafe(naked)]
+pub unsafe extern "C" fn switch_context(current_stack_ptr: *mut VirtAddr, next_stack: VirtAddr) {
+    naked_asm!(
+        save_context!(),
+        "mov [rdi], rsp",
+        "mov rsp, rsi",
+        restore_context!(),
+        "ret"
+    );
 }

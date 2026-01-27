@@ -1,18 +1,15 @@
-use core::arch::naked_asm;
-
 use pic8259::ChainedPics;
 use spin::{Lazy, Mutex};
 use x86_64::{
-    VirtAddr,
     registers::control::Cr2,
     structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
 };
 
 use crate::{
     gdt::DOUBLE_FAULT_IST_INDEX,
-    println, restore_context, save_context,
+    println,
     task::timer::on_timer_tick,
-    thread::context::{ContextFrame, try_switch_threads},
+    thread::{self},
 };
 
 const PIC_MASTER_OFFSET: u8 = 32;
@@ -46,10 +43,8 @@ static IDT: Lazy<InterruptDescriptorTable> = Lazy::new(|| {
         idt.double_fault
             .set_handler_fn(doublefault_handler)
             .set_stack_index(DOUBLE_FAULT_IST_INDEX);
-
-        idt[IRQIndex::Timer.with_offset()]
-            .set_handler_addr(VirtAddr::new(timer_handler as *const () as u64));
     }
+    idt[IRQIndex::Timer.with_offset()].set_handler_fn(timer_handler);
 
     idt
 });
@@ -107,27 +102,7 @@ extern "x86-interrupt" fn doublefault_handler(
     panic!("EXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
 }
 
-#[unsafe(naked)]
-extern "C" fn timer_handler() {
-    // SS, RSP, RFLAGS, CS and RIP are pushed to current thread's stack by hardware in ContextFrame order
-    naked_asm!(
-        // Push preserved and scratch registers to current thread's stack in ContextFrame order
-        save_context!(),
-        // Pass current thread's stack pointer to the inner function
-        "mov rdi, rsp",
-        // Returns same RSP, or next thread's RSP if needed schedule
-        "call timer_handler_inner",
-        // Switch stack to returned pointer
-        "mov rsp, rax",
-        // Pop preserved and scratch registers from next thread's stack in ContextFrame order
-        restore_context!(),
-        // SS, RSP, RFLAGS, CS and RIP are popped from next thread's stack in ContextFrame order
-        "iretq"
-    );
-}
-
-#[unsafe(no_mangle)]
-extern "C" fn timer_handler_inner(current_frame: *mut ContextFrame) -> *mut ContextFrame {
+extern "x86-interrupt" fn timer_handler(_stack_frame: InterruptStackFrame) {
     unsafe {
         PICS.lock()
             .notify_end_of_interrupt(IRQIndex::Timer.with_offset());
@@ -135,5 +110,5 @@ extern "C" fn timer_handler_inner(current_frame: *mut ContextFrame) -> *mut Cont
 
     on_timer_tick();
 
-    try_switch_threads(current_frame)
+    thread::schedule();
 }

@@ -1,9 +1,12 @@
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::{
+    arch::naked_asm,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use alloc::boxed::Box;
-use x86_64::VirtAddr;
+use x86_64::{VirtAddr, instructions::interrupts};
 
-use crate::thread::{self, context::ContextFrame};
+use crate::thread::{self, context::Context};
 
 const STACK_SIZE: usize = 16384;
 
@@ -21,22 +24,15 @@ impl Thread {
         unsafe {
             let stack_top = stack.as_mut_ptr().add(STACK_SIZE);
 
-            let ret_addr_ptr = stack_top.sub(8);
-            core::ptr::write(ret_addr_ptr as *mut u64, thread::exit as *const () as u64);
+            let context_size = size_of::<Context>();
+            let stack_ptr = stack_top.sub(context_size);
 
-            let context_size = size_of::<ContextFrame>();
-            let stack_ptr = ret_addr_ptr.sub(context_size);
-
-            let context_ptr = stack_ptr as *mut ContextFrame;
+            let context_ptr = stack_ptr as *mut Context;
             core::ptr::write_bytes(context_ptr, 0, 1);
 
             let context = &mut *context_ptr;
-
-            context.rip = entry as u64;
-            context.cs = 0x8;
-            context.rflags = 0x202;
-            context.rsp = ret_addr_ptr as u64;
-            context.ss = 0x10;
+            context.rip = entry_wrapper as *const () as u64;
+            context.r12 = entry as u64;
 
             Self {
                 id: ThreadId::new(),
@@ -49,6 +45,8 @@ impl Thread {
 
     pub fn new_idle() -> Self {
         Self::new(|| {
+            interrupts::enable();
+
             loop {
                 x86_64::instructions::hlt();
             }
@@ -67,6 +65,10 @@ impl Thread {
         &mut self.stack_ptr
     }
 
+    pub fn state(&self) -> ThreadState {
+        self.state
+    }
+
     pub fn set_ready(&mut self) {
         self.state = ThreadState::Ready;
     }
@@ -82,6 +84,11 @@ impl Thread {
     pub fn set_dead(&mut self) {
         self.state = ThreadState::Dead;
     }
+}
+
+#[unsafe(naked)]
+extern "C" fn entry_wrapper() -> ! {
+    naked_asm!("sti", "call r12", "call {thread_exit}", thread_exit = sym thread::exit);
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]

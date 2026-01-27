@@ -64,6 +64,8 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     SCHEDULER.lock().spawn(Thread::new(|| {
         println!("Task 2");
+        thread::yield_now();
+        panic!("unreachable for now");
     }));
 
     SCHEDULER.lock().run();
