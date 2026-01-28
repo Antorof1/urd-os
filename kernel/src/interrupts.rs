@@ -1,3 +1,5 @@
+use core::sync::atomic::{AtomicU64, Ordering};
+
 use pic8259::ChainedPics;
 use spin::{Lazy, Mutex};
 use x86_64::{
@@ -103,12 +105,19 @@ extern "x86-interrupt" fn doublefault_handler(
 }
 
 extern "x86-interrupt" fn timer_handler(_stack_frame: InterruptStackFrame) {
+    static TICK_COUNT: AtomicU64 = AtomicU64::new(0);
+
     unsafe {
         PICS.lock()
             .notify_end_of_interrupt(IRQIndex::Timer.with_offset());
     }
 
+    let prev_tick = TICK_COUNT.fetch_add(1, Ordering::Relaxed);
+
     on_timer_tick();
 
-    thread::schedule();
+    // 250 Hz
+    if (prev_tick + 1) % 4 == 0 {
+        thread::schedule();
+    }
 }
