@@ -1,6 +1,6 @@
 use core::{
     pin::Pin,
-    sync::atomic::{AtomicU64, Ordering},
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
     task::{Context, Poll, Waker},
     time::Duration,
 };
@@ -12,11 +12,16 @@ use spin::Mutex;
 static TICKS: AtomicU64 = AtomicU64::new(0);
 static WAKER: AtomicWaker = AtomicWaker::new();
 static QUEUE: Mutex<BTreeMap<u64, Vec<Waker>>> = Mutex::new(BTreeMap::new());
+static HAS_SLEEPERS: AtomicBool = AtomicBool::new(false);
 
-pub fn on_timer_tick() {
-    let _ = TICKS.fetch_add(1, Ordering::Release);
+pub fn on_timer_tick() -> u64 {
+    let current_tick = TICKS.fetch_add(1, Ordering::Release);
 
-    WAKER.wake();
+    if HAS_SLEEPERS.load(Ordering::Relaxed) {
+        WAKER.wake();
+    }
+
+    current_tick
 }
 
 pub struct Sleep {
@@ -46,6 +51,8 @@ impl Future for Sleep {
             .entry(self.deadline)
             .or_insert_with(Vec::new)
             .push(cx.waker().clone());
+
+        HAS_SLEEPERS.store(true, Ordering::Relaxed);
 
         Poll::Pending
     }
@@ -84,18 +91,22 @@ pub async fn task() {
     let mut stream = TickStream::new();
 
     while let Some(now) = stream.next().await {
+        if !HAS_SLEEPERS.load(Ordering::Relaxed) {
+            continue;
+        }
+
         let mut queue = QUEUE.lock();
 
-        while let Some(entry) = queue.first_entry() {
-            if *entry.key() > now {
-                break;
-            }
+        let pending = queue.split_off(&(now + 1));
+        let expired = core::mem::replace(&mut *queue, pending);
 
-            let wakers = entry.remove();
-
+        for (_, wakers) in expired {
             for waker in wakers {
                 waker.wake();
             }
         }
+
+        let is_empty = queue.is_empty();
+        HAS_SLEEPERS.store(!is_empty, Ordering::Relaxed);
     }
 }

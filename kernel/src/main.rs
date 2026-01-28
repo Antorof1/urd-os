@@ -14,7 +14,7 @@ pub mod task;
 pub mod thread;
 
 use bootloader_api::{BootInfo, BootloaderConfig, config::Mapping, entry_point};
-use core::panic::PanicInfo;
+use core::{panic::PanicInfo, time::Duration};
 use x86_64::VirtAddr;
 
 use crate::{
@@ -24,6 +24,7 @@ use crate::{
         heap, paging,
         vmm::VMM,
     },
+    task::{Task, executor::Executor, timer},
     thread::{Thread, scheduler::SCHEDULER},
 };
 
@@ -58,14 +59,18 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     VMM.lock().init(page_mapper);
     SCHEDULER.lock().init();
 
-    SCHEDULER.lock().spawn(Thread::new(|| {
-        println!("Task 1");
-    }));
+    thread::spawn(Thread::new(|| {
+        let mut task_executor = Executor::new();
 
-    SCHEDULER.lock().spawn(Thread::new(|| {
-        println!("Task 2");
-        thread::yield_now();
-        panic!("unreachable for now");
+        task_executor.spawn(Task::new(timer::task()));
+        task_executor.spawn(Task::new(async {
+            loop {
+                print!(".");
+                timer::sleep(Duration::from_millis(100)).await;
+            }
+        }));
+
+        task_executor.run();
     }));
 
     SCHEDULER.lock().run();

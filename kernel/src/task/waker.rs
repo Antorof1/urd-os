@@ -1,7 +1,7 @@
 use alloc::{sync::Arc, task::Wake};
 use crossbeam_queue::ArrayQueue;
 
-use crate::task::TaskId;
+use crate::task::{TaskId, executor::wake_executor_thread};
 
 pub struct TaskWaker {
     task_id: TaskId,
@@ -26,5 +26,7 @@ impl Wake for TaskWaker {
         self.task_queue
             .push(self.task_id)
             .expect("Executor queue is full");
+
+        wake_executor_thread();
     }
 }

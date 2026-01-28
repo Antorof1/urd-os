@@ -1,9 +1,38 @@
-use core::task::{Context, Poll, Waker};
+use core::{
+    sync::atomic::{AtomicU64, Ordering},
+    task::{Context, Poll, Waker},
+};
 
 use alloc::{collections::btree_map::BTreeMap, sync::Arc};
 use crossbeam_queue::ArrayQueue;
 
-use crate::task::{Task, TaskId, waker::TaskWaker};
+use crate::{
+    task::{Task, TaskId, waker::TaskWaker},
+    thread::{self, ThreadId},
+};
+
+static EXECUTOR_THREAD_ID: AtomicU64 = AtomicU64::new(0);
+
+fn register_executor_thread() {
+    let id = thread::current_id();
+
+    if EXECUTOR_THREAD_ID
+        .compare_exchange(0, id.as_u64(), Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        panic!("Failed to register executor: an executor thread is already registered")
+    }
+}
+
+pub fn wake_executor_thread() {
+    let id = EXECUTOR_THREAD_ID.load(Ordering::Relaxed);
+
+    if id == 0 {
+        panic!("Failed to wake executor: no executor thread has been registered");
+    }
+
+    thread::wake(ThreadId::from_u64(id));
+}
 
 pub struct Executor {
     tasks: BTreeMap<TaskId, Task>,
@@ -31,6 +60,8 @@ impl Executor {
     }
 
     pub fn run(&mut self) -> ! {
+        register_executor_thread();
+
         loop {
             while let Some(task_id) = self.task_queue.pop() {
                 let task = match self.tasks.get_mut(&task_id) {
@@ -51,15 +82,7 @@ impl Executor {
                 }
             }
 
-            use x86_64::instructions::interrupts;
-
-            interrupts::disable();
-
-            if self.task_queue.is_empty() {
-                interrupts::enable_and_hlt();
-            } else {
-                interrupts::enable();
-            }
+            thread::yield_now();
         }
     }
 }

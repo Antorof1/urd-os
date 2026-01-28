@@ -100,6 +100,14 @@ impl ThreadId {
 
         Self(NEXT_ID.fetch_add(1, Ordering::Relaxed))
     }
+
+    pub fn from_u64(value: u64) -> Self {
+        Self(value)
+    }
+
+    pub fn as_u64(&self) -> u64 {
+        self.0
+    }
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]

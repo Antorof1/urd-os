@@ -1,7 +1,7 @@
 use alloc::collections::btree_map::BTreeMap;
 use crossbeam_queue::ArrayQueue;
 use spin::Mutex;
-use x86_64::{VirtAddr, instructions::interrupts};
+use x86_64::VirtAddr;
 
 use crate::thread::{
     Thread, ThreadId,
@@ -121,75 +121,91 @@ impl Scheduler {
     }
 
     pub fn exit_current_thread(&mut self) -> ! {
-        interrupts::without_interrupts(|| {
-            let current_id = self
-                .current_thread_id
-                .expect("Scheduler called before run()");
+        let current_id = self
+            .current_thread_id
+            .expect("Scheduler called before run()");
 
-            if Some(current_id) == self.idle_thread_id {
-                panic!("Cannot exit idle thread");
-            }
+        if Some(current_id) == self.idle_thread_id {
+            panic!("Cannot exit idle thread");
+        }
 
-            let current_thread = self.threads.get_mut(&current_id).unwrap();
-            current_thread.set_dead();
+        let current_thread = self.threads.get_mut(&current_id).unwrap();
+        current_thread.set_dead();
 
-            self.dead_threads
-                .as_mut()
-                .unwrap()
-                .push(current_id)
-                .expect("Dead threads queue is full");
+        self.dead_threads
+            .as_mut()
+            .unwrap()
+            .push(current_id)
+            .expect("Dead threads queue is full");
 
-            let next_id = self.next_thread_id();
+        let next_id = self.next_thread_id();
 
-            self.current_thread_id = Some(next_id);
+        self.current_thread_id = Some(next_id);
 
-            let next_thread = self.threads.get(&next_id).unwrap();
+        let next_thread = self.threads.get(&next_id).unwrap();
 
-            unsafe {
-                SCHEDULER.force_unlock();
+        unsafe {
+            SCHEDULER.force_unlock();
 
-                switch_to_context(next_thread.stack_ptr());
-            }
-        });
+            switch_to_context(next_thread.stack_ptr());
+        }
         unreachable!();
     }
 
     pub fn block_current_thread(&mut self) {
-        interrupts::without_interrupts(|| {
-            let current_id = self
-                .current_thread_id
-                .expect("Scheduler called before run()");
+        let current_id = self
+            .current_thread_id
+            .expect("Scheduler called before run()");
 
-            if Some(current_id) == self.idle_thread_id {
-                panic!("Cannot block idle thread");
-            }
+        if Some(current_id) == self.idle_thread_id {
+            panic!("Cannot block idle thread");
+        }
 
-            let next_id = self.next_thread_id();
+        let next_id = self.next_thread_id();
 
-            unsafe {
-                let threads_ptr = &mut self.threads as *mut BTreeMap<ThreadId, Thread>;
+        unsafe {
+            let threads_ptr = &mut self.threads as *mut BTreeMap<ThreadId, Thread>;
 
-                let current_thread = (*threads_ptr).get_mut(&current_id).unwrap();
-                let next_thread = (*threads_ptr).get_mut(&next_id).unwrap();
+            let current_thread = (*threads_ptr).get_mut(&current_id).unwrap();
+            let next_thread = (*threads_ptr).get_mut(&next_id).unwrap();
 
-                current_thread.set_blocked();
-                next_thread.set_running();
+            current_thread.set_blocked();
+            next_thread.set_running();
 
-                self.current_thread_id = Some(next_id);
+            self.current_thread_id = Some(next_id);
 
-                SCHEDULER.force_unlock();
+            SCHEDULER.force_unlock();
 
-                switch_context(current_thread.stack_ptr_mut(), next_thread.stack_ptr());
-            }
-        });
+            switch_context(current_thread.stack_ptr_mut(), next_thread.stack_ptr());
+        }
+    }
+
+    pub fn wake_thread(&mut self, id: ThreadId) {
+        let thread = self.threads.get_mut(&id).expect("Thread not found");
+
+        match thread.state() {
+            ThreadState::Ready => return,
+            ThreadState::Running => {}
+            _ => thread.set_ready(),
+        }
+
+        self.thread_queue_mut()
+            .push(id)
+            .expect("Scheduler queue is full");
+    }
+
+    pub fn current_thread_id(&self) -> ThreadId {
+        self.current_thread_id
+            .expect("Scheduler called before run()")
     }
 
     fn next_thread_id(&mut self) -> ThreadId {
         while let Some(id) = self.thread_queue_mut().pop() {
             let thread = self.threads.get(&id).unwrap();
 
-            if thread.state() == ThreadState::Ready {
-                return id;
+            match thread.state() {
+                ThreadState::Ready | ThreadState::Running => return id,
+                _ => continue,
             }
         }
 

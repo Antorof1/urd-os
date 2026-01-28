@@ -3,6 +3,7 @@ pub mod scheduler;
 pub mod thread;
 
 pub use thread::{Thread, ThreadId};
+use x86_64::instructions::interrupts;
 
 use crate::thread::{context::switch_context, scheduler::SCHEDULER};
 
@@ -16,10 +17,22 @@ pub fn schedule() {
     }
 }
 
+pub fn spawn(thread: Thread) {
+    interrupts::without_interrupts(|| SCHEDULER.lock().spawn(thread));
+}
+
 pub fn exit() -> ! {
-    SCHEDULER.lock().exit_current_thread();
+    interrupts::without_interrupts(|| SCHEDULER.lock().exit_current_thread())
 }
 
 pub fn yield_now() {
-    SCHEDULER.lock().block_current_thread();
+    interrupts::without_interrupts(|| SCHEDULER.lock().block_current_thread());
+}
+
+pub fn wake(id: ThreadId) {
+    interrupts::without_interrupts(|| SCHEDULER.lock().wake_thread(id));
+}
+
+pub fn current_id() -> ThreadId {
+    interrupts::without_interrupts(|| SCHEDULER.lock().current_thread_id())
 }
