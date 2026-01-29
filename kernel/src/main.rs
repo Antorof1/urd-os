@@ -10,6 +10,7 @@ pub mod gdt;
 pub mod interrupts;
 pub mod memory;
 pub mod pit;
+pub mod sync;
 pub mod task;
 pub mod thread;
 

@@ -1,26 +1,29 @@
 use alloc::collections::btree_map::BTreeMap;
 use crossbeam_queue::ArrayQueue;
-use spin::{Mutex, Once};
+use spin::Once;
 use x86_64::VirtAddr;
 
-use crate::thread::{
-    Thread, ThreadId,
-    context::{switch_context, switch_to_context},
-    thread::ThreadState,
+use crate::{
+    sync::IrqLock,
+    thread::{
+        Thread, ThreadId,
+        context::{switch_context, switch_to_context},
+        thread::ThreadState,
+    },
 };
 
-static SCHEDULER: Once<Mutex<Scheduler>> = Once::new();
+static SCHEDULER: Once<IrqLock<Scheduler>> = Once::new();
 
-pub(super) fn scheduler() -> &'static Mutex<Scheduler> {
+pub(super) fn scheduler() -> &'static IrqLock<Scheduler> {
     SCHEDULER.get().expect("Scheduler called before init()")
 }
 
 pub fn init() {
-    SCHEDULER.call_once(|| Mutex::new(Scheduler::new()));
+    SCHEDULER.call_once(|| IrqLock::new(Scheduler::new()));
 }
 
 pub fn run() -> ! {
-    scheduler().lock().run()
+    scheduler().lock(|s| s.run())
 }
 
 pub struct Scheduler {
