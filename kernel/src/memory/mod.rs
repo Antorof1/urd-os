@@ -1,6 +1,9 @@
 use x86_64::{
     VirtAddr,
-    structures::paging::{PageTableFlags, Size4KiB, mapper::MapToError},
+    structures::paging::{
+        PageTableFlags, Size4KiB,
+        mapper::{MapToError, UnmapError},
+    },
 };
 
 use crate::memory::vmm::vmm;
@@ -22,4 +25,12 @@ pub fn alloc_range(
     flags: PageTableFlags,
 ) -> Result<(), MapToError<Size4KiB>> {
     vmm().lock(|vmm| vmm.alloc_range(address, size, flags))
+}
+
+pub fn dealloc_page(address: VirtAddr) -> Result<(), UnmapError> {
+    vmm().lock(|vmm| vmm.dealloc_page(address))
+}
+
+pub fn dealloc_range(address: VirtAddr, size: u64) -> Result<(), UnmapError> {
+    vmm().lock(|vmm| vmm.dealloc_range(address, size))
 }

@@ -3,7 +3,7 @@ use x86_64::{
     VirtAddr,
     structures::paging::{
         FrameAllocator, FrameDeallocator, Mapper, OffsetPageTable, Page, PageTableFlags, Size4KiB,
-        mapper::MapToError,
+        mapper::{MapToError, UnmapError},
     },
 };
 
@@ -108,6 +108,37 @@ impl VirtualMemoryManager {
                         return Err(e);
                     }
                 }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn dealloc_page(&mut self, address: VirtAddr) -> Result<(), UnmapError> {
+        let page = Page::<Size4KiB>::containing_address(address);
+
+        let (frame, flush) = self.mapper.unmap(page)?;
+        flush.flush();
+
+        unsafe {
+            self.frame_allocator.deallocate_frame(frame);
+        }
+
+        Ok(())
+    }
+
+    pub fn dealloc_range(&mut self, address: VirtAddr, size: u64) -> Result<(), UnmapError> {
+        let first_page = Page::containing_address(address);
+        let last_page = Page::containing_address(address + size - 1u64);
+        let pages = Page::<Size4KiB>::range_inclusive(first_page, last_page);
+
+        for page in pages {
+            // Stop on error if caller fucked up
+            let (frame, flush) = self.mapper.unmap(page)?;
+            flush.flush();
+
+            unsafe {
+                self.frame_allocator.deallocate_frame(frame);
             }
         }
 
