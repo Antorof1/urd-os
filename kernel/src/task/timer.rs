@@ -1,27 +1,34 @@
 use core::{
     pin::Pin,
-    sync::atomic::{AtomicBool, AtomicU64, Ordering},
+    sync::atomic::{AtomicU64, Ordering},
     task::{Context, Poll, Waker},
     time::Duration,
 };
 
-use alloc::{collections::btree_map::BTreeMap, vec::Vec};
-use futures_util::{Stream, StreamExt, task::AtomicWaker};
+use alloc::collections::binary_heap::BinaryHeap;
 use spin::Mutex;
+use x86_64::instructions::interrupts;
 
 static TICKS: AtomicU64 = AtomicU64::new(0);
-static WAKER: AtomicWaker = AtomicWaker::new();
-static QUEUE: Mutex<BTreeMap<u64, Vec<Waker>>> = Mutex::new(BTreeMap::new());
-static HAS_SLEEPERS: AtomicBool = AtomicBool::new(false);
+static QUEUE: Mutex<BinaryHeap<TimerEntry>> = Mutex::new(BinaryHeap::new());
 
 pub fn on_timer_tick() -> u64 {
-    let current_tick = TICKS.fetch_add(1, Ordering::Release);
+    let now = TICKS.fetch_add(1, Ordering::Release) + 1;
 
-    if HAS_SLEEPERS.load(Ordering::Relaxed) {
-        WAKER.wake();
+    {
+        let mut queue = QUEUE.lock();
+
+        while let Some(entry) = queue.peek() {
+            if entry.deadline > now {
+                break;
+            }
+
+            let entry = queue.pop().unwrap();
+            entry.waker.wake();
+        }
     }
 
-    current_tick
+    now
 }
 
 pub struct Sleep {
@@ -46,67 +53,38 @@ impl Future for Sleep {
             return Poll::Ready(());
         }
 
-        QUEUE
-            .lock()
-            .entry(self.deadline)
-            .or_insert_with(Vec::new)
-            .push(cx.waker().clone());
-
-        HAS_SLEEPERS.store(true, Ordering::Relaxed);
-
-        Poll::Pending
-    }
-}
-
-struct TickStream {
-    last_tick: u64,
-}
-
-impl TickStream {
-    pub fn new() -> Self {
-        let last_tick = TICKS.load(Ordering::Acquire);
-
-        Self { last_tick }
-    }
-}
-
-impl Stream for TickStream {
-    type Item = u64;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        WAKER.register(cx.waker());
-
-        let now = TICKS.load(Ordering::Acquire);
-
-        if now > self.last_tick {
-            self.last_tick = now;
-            return Poll::Ready(Some(now));
-        }
+        interrupts::without_interrupts(|| {
+            QUEUE.lock().push(TimerEntry {
+                deadline: self.deadline,
+                waker: cx.waker().clone(),
+            });
+        });
 
         Poll::Pending
     }
 }
 
-pub async fn task() {
-    let mut stream = TickStream::new();
+struct TimerEntry {
+    deadline: u64,
+    waker: Waker,
+}
 
-    while let Some(now) = stream.next().await {
-        if !HAS_SLEEPERS.load(Ordering::Relaxed) {
-            continue;
-        }
+impl PartialEq for TimerEntry {
+    fn eq(&self, other: &Self) -> bool {
+        self.deadline == other.deadline
+    }
+}
 
-        let mut queue = QUEUE.lock();
+impl Eq for TimerEntry {}
 
-        let pending = queue.split_off(&(now + 1));
-        let expired = core::mem::replace(&mut *queue, pending);
+impl PartialOrd for TimerEntry {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
-        for (_, wakers) in expired {
-            for waker in wakers {
-                waker.wake();
-            }
-        }
-
-        let is_empty = queue.is_empty();
-        HAS_SLEEPERS.store(!is_empty, Ordering::Relaxed);
+impl Ord for TimerEntry {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        other.deadline.cmp(&self.deadline)
     }
 }

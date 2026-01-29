@@ -108,10 +108,10 @@ extern "x86-interrupt" fn timer_handler(_stack_frame: InterruptStackFrame) {
             .notify_end_of_interrupt(IRQIndex::Timer.with_offset());
     }
 
-    let prev_tick = on_timer_tick();
+    let current_tick = on_timer_tick();
 
     // 250 Hz
-    if (prev_tick + 1) % 4 == 0 {
+    if current_tick % 4 == 0 {
         thread::schedule();
     }
 }

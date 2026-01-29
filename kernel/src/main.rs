@@ -62,7 +62,6 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     thread::spawn(Thread::new(|| {
         let mut task_executor = Executor::new();
 
-        task_executor.spawn(Task::new(timer::task()));
         task_executor.spawn(Task::new(async {
             loop {
                 print!(".");
