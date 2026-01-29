@@ -25,7 +25,7 @@ use crate::{
         vmm::VMM,
     },
     task::{Task, executor::Executor, timer},
-    thread::{Thread, scheduler::SCHEDULER},
+    thread::{Thread, scheduler},
 };
 
 static BOOTLOADER_CONFIG: BootloaderConfig = {
@@ -57,7 +57,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     PFA.lock().init(frame_count, boot_frame_allocator);
     VMM.lock().init(page_mapper);
-    SCHEDULER.lock().init();
+    scheduler::init();
 
     thread::spawn(Thread::new(|| {
         let mut task_executor = Executor::new();
@@ -73,7 +73,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         task_executor.run();
     }));
 
-    SCHEDULER.lock().run();
+    scheduler::run();
 }
 
 #[panic_handler]

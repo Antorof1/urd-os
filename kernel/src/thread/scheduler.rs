@@ -1,6 +1,6 @@
 use alloc::collections::btree_map::BTreeMap;
 use crossbeam_queue::ArrayQueue;
-use spin::Mutex;
+use spin::{Mutex, Once};
 use x86_64::VirtAddr;
 
 use crate::thread::{
@@ -9,48 +9,56 @@ use crate::thread::{
     thread::ThreadState,
 };
 
-pub static SCHEDULER: Mutex<Scheduler> = Mutex::new(Scheduler::new());
+static SCHEDULER: Once<Mutex<Scheduler>> = Once::new();
+
+pub(super) fn scheduler() -> &'static Mutex<Scheduler> {
+    SCHEDULER.get().expect("Scheduler called before init()")
+}
+
+pub fn init() {
+    SCHEDULER.call_once(|| Mutex::new(Scheduler::new()));
+}
+
+pub fn run() -> ! {
+    scheduler().lock().run()
+}
 
 pub struct Scheduler {
     threads: BTreeMap<ThreadId, Thread>,
-    thread_queue: Option<ArrayQueue<ThreadId>>,
-    dead_threads: Option<ArrayQueue<ThreadId>>,
+    thread_queue: ArrayQueue<ThreadId>,
+    dead_threads: ArrayQueue<ThreadId>,
     current_thread_id: Option<ThreadId>,
-    idle_thread_id: Option<ThreadId>,
+    idle_thread_id: ThreadId,
 }
 
 impl Scheduler {
-    pub const fn new() -> Self {
-        Self {
-            threads: BTreeMap::new(),
-            thread_queue: None,
-            dead_threads: None,
-            current_thread_id: None,
-            idle_thread_id: None,
-        }
-    }
-
-    pub fn init(&mut self) {
-        self.thread_queue = Some(ArrayQueue::new(1024));
-        self.dead_threads = Some(ArrayQueue::new(1024));
-
+    pub fn new() -> Self {
         let idle_thread = Thread::new_idle();
         let idle_thread_id = idle_thread.id();
 
-        self.threads.insert(idle_thread_id, idle_thread);
+        let mut threads = BTreeMap::new();
 
-        self.idle_thread_id = Some(idle_thread_id);
+        threads.insert(idle_thread_id, idle_thread);
+
+        Self {
+            threads,
+            thread_queue: ArrayQueue::new(1024),
+            dead_threads: ArrayQueue::new(1024),
+            current_thread_id: None,
+            idle_thread_id: idle_thread_id,
+        }
     }
 
     pub fn run(&mut self) -> ! {
-        let idle_id = self.idle_thread_id.expect("Scheduler called before init()");
+        self.current_thread_id = Some(self.idle_thread_id);
 
-        self.current_thread_id = Some(idle_id);
-
-        let idle_thread = self.threads.get(&idle_id).unwrap();
+        let idle_thread = self
+            .threads
+            .get(&self.idle_thread_id)
+            .expect("Inserted in new()");
 
         unsafe {
-            SCHEDULER.force_unlock();
+            scheduler().force_unlock();
 
             switch_to_context(idle_thread.stack_ptr());
         }
@@ -66,18 +74,13 @@ impl Scheduler {
             panic!("Thread NEXT_ID overflow");
         }
 
-        self.thread_queue_mut()
+        self.thread_queue
             .push(thread_id)
             .expect("Scheduler queue is full");
     }
 
     pub fn schedule(&mut self) -> Option<(*mut VirtAddr, VirtAddr)> {
-        let dead_threads = self
-            .dead_threads
-            .as_mut()
-            .expect("Scheduler called before init()");
-
-        while let Some(id) = dead_threads.pop() {
+        while let Some(id) = self.dead_threads.pop() {
             self.threads.remove(&id).unwrap();
         }
 
@@ -97,16 +100,12 @@ impl Scheduler {
             let current_thread = (*threads_ptr).get_mut(&current_id).unwrap();
             let next_thread = (*threads_ptr).get_mut(&next_id).unwrap();
 
-            if next_id == self.idle_thread_id.unwrap()
-                && current_thread.state() == ThreadState::Running
-            {
+            if next_id == self.idle_thread_id && current_thread.state() == ThreadState::Running {
                 return None;
             }
 
-            if current_id != self.idle_thread_id.unwrap()
-                && current_thread.state() == ThreadState::Running
-            {
-                self.thread_queue_mut()
+            if current_id != self.idle_thread_id && current_thread.state() == ThreadState::Running {
+                self.thread_queue
                     .push(current_id)
                     .expect("Scheduler queue is full");
             }
@@ -125,7 +124,7 @@ impl Scheduler {
             .current_thread_id
             .expect("Scheduler called before run()");
 
-        if Some(current_id) == self.idle_thread_id {
+        if current_id == self.idle_thread_id {
             panic!("Cannot exit idle thread");
         }
 
@@ -133,8 +132,6 @@ impl Scheduler {
         current_thread.set_dead();
 
         self.dead_threads
-            .as_mut()
-            .unwrap()
             .push(current_id)
             .expect("Dead threads queue is full");
 
@@ -145,7 +142,7 @@ impl Scheduler {
         let next_thread = self.threads.get(&next_id).unwrap();
 
         unsafe {
-            SCHEDULER.force_unlock();
+            scheduler().force_unlock();
 
             switch_to_context(next_thread.stack_ptr());
         }
@@ -157,7 +154,7 @@ impl Scheduler {
             .current_thread_id
             .expect("Scheduler called before run()");
 
-        if Some(current_id) == self.idle_thread_id {
+        if current_id == self.idle_thread_id {
             panic!("Cannot block idle thread");
         }
 
@@ -174,7 +171,7 @@ impl Scheduler {
 
             self.current_thread_id = Some(next_id);
 
-            SCHEDULER.force_unlock();
+            scheduler().force_unlock();
 
             switch_context(current_thread.stack_ptr_mut(), next_thread.stack_ptr());
         }
@@ -189,9 +186,7 @@ impl Scheduler {
             _ => thread.set_ready(),
         }
 
-        self.thread_queue_mut()
-            .push(id)
-            .expect("Scheduler queue is full");
+        self.thread_queue.push(id).expect("Scheduler queue is full");
     }
 
     pub fn current_thread_id(&self) -> ThreadId {
@@ -200,7 +195,7 @@ impl Scheduler {
     }
 
     fn next_thread_id(&mut self) -> ThreadId {
-        while let Some(id) = self.thread_queue_mut().pop() {
+        while let Some(id) = self.thread_queue.pop() {
             let thread = self.threads.get(&id).unwrap();
 
             match thread.state() {
@@ -209,12 +204,6 @@ impl Scheduler {
             }
         }
 
-        self.idle_thread_id.unwrap()
-    }
-
-    fn thread_queue_mut(&mut self) -> &mut ArrayQueue<ThreadId> {
-        self.thread_queue
-            .as_mut()
-            .expect("Scheduler called before init()")
+        self.idle_thread_id
     }
 }
