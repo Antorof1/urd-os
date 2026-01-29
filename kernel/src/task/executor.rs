@@ -7,7 +7,7 @@ use alloc::{collections::btree_map::BTreeMap, sync::Arc};
 use crossbeam_queue::ArrayQueue;
 
 use crate::{
-    task::{Task, TaskId, waker::TaskWaker},
+    task::{Task, TaskId, waker::ContextWaker},
     thread::{self, ThreadId},
 };
 
@@ -69,7 +69,8 @@ impl Executor {
                     None => continue,
                 };
 
-                let waker_data = Arc::new(TaskWaker::new(task_id, Arc::clone(&self.task_queue)));
+                let waker_data =
+                    Arc::new(ContextWaker::task(task_id, Arc::clone(&self.task_queue)));
 
                 let waker = Waker::from(waker_data);
                 let mut context = Context::from_waker(&waker);

@@ -6,9 +6,12 @@ use core::{
 
 use alloc::boxed::Box;
 
+pub mod block_on;
 pub mod executor;
 pub mod timer;
 pub mod waker;
+
+pub use block_on::block_on;
 
 pub struct Task {
     future: Pin<Box<dyn Future<Output = ()>>>,
