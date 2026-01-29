@@ -1,28 +1,19 @@
 use alloc::vec::Vec;
-use spin::Mutex;
 use x86_64::{
     align_up,
     structures::paging::{FrameAllocator, FrameDeallocator, PageSize, PhysFrame, Size4KiB},
 };
-
-pub static PFA: Mutex<StackFrameAllocator> = Mutex::new(StackFrameAllocator::new());
 
 pub struct StackFrameAllocator {
     frames: Vec<PhysFrame>,
 }
 
 impl StackFrameAllocator {
-    pub const fn new() -> Self {
-        Self { frames: Vec::new() }
-    }
+    pub fn new(frame_count: usize, frame_iter: impl Iterator<Item = PhysFrame<Size4KiB>>) -> Self {
+        let mut frames = Vec::with_capacity(frame_count); // Overallocation just in case
+        frames.extend(frame_iter);
 
-    pub fn init(
-        &mut self,
-        frame_count: usize,
-        frame_iter: impl Iterator<Item = PhysFrame<Size4KiB>>,
-    ) {
-        self.frames.reserve(frame_count); // Overallocation just in case
-        self.frames.extend(frame_iter);
+        Self { frames }
     }
 }
 

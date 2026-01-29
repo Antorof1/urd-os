@@ -21,7 +21,7 @@ use x86_64::VirtAddr;
 use crate::{
     memory::{
         boot_frame::BootFrameAllocator,
-        frame::{PFA, initial_heap_size},
+        frame::{StackFrameAllocator, initial_heap_size},
         heap, paging, vmm,
     },
     task::{Task, executor::Executor, timer},
@@ -55,8 +55,9 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     heap::init_boot(&mut boot_frame_allocator, &mut page_mapper, heap_size)
         .expect("boot heap init error");
 
-    PFA.lock().init(frame_count, boot_frame_allocator);
-    vmm::init(page_mapper);
+    let frame_allocator = StackFrameAllocator::new(frame_count, boot_frame_allocator);
+
+    vmm::init(page_mapper, frame_allocator);
     scheduler::init();
 
     thread::spawn(Thread::new(|| {
