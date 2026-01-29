@@ -17,7 +17,7 @@ fn register_executor_thread() {
     let id = thread::current_id();
 
     if EXECUTOR_THREAD_ID
-        .compare_exchange(0, id.as_u64(), Ordering::SeqCst, Ordering::SeqCst)
+        .compare_exchange(0, id.as_u64(), Ordering::Release, Ordering::Relaxed)
         .is_err()
     {
         panic!("Failed to register executor: an executor thread is already registered")
@@ -25,7 +25,7 @@ fn register_executor_thread() {
 }
 
 pub fn wake_executor_thread() {
-    let id = EXECUTOR_THREAD_ID.load(Ordering::Relaxed);
+    let id = EXECUTOR_THREAD_ID.load(Ordering::Acquire);
 
     if id == 0 {
         panic!("Failed to wake executor: no executor thread has been registered");
