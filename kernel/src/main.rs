@@ -22,8 +22,7 @@ use crate::{
     memory::{
         boot_frame::BootFrameAllocator,
         frame::{PFA, initial_heap_size},
-        heap, paging,
-        vmm::VMM,
+        heap, paging, vmm,
     },
     task::{Task, executor::Executor, timer},
     thread::{Thread, scheduler},
@@ -57,7 +56,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         .expect("boot heap init error");
 
     PFA.lock().init(frame_count, boot_frame_allocator);
-    VMM.lock().init(page_mapper);
+    vmm::init(page_mapper);
     scheduler::init();
 
     thread::spawn(Thread::new(|| {

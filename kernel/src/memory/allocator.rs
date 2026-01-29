@@ -12,7 +12,7 @@ use x86_64::{
     structures::paging::{PageSize, Size4KiB},
 };
 
-use crate::memory::{heap, vmm::VMM};
+use crate::memory::{alloc_range, heap};
 
 #[global_allocator]
 pub static ALLOCATOR: LockedAllocator = LockedAllocator::new();
@@ -60,16 +60,10 @@ impl OomHandler for HeapOomHandler {
         let growth_size = cmp::max(requested_size, heap::MIN_HEAP_GROW);
 
         let size_to_map = align_up(growth_size, Size4KiB::SIZE);
-        let required_pages = size_to_map / Size4KiB::SIZE;
 
         let start_addr = VirtAddr::new(heap::HEAP_TOP.fetch_add(size_to_map, Ordering::SeqCst));
 
-        let mut vmm = VMM.lock();
-
-        for i in 0..required_pages {
-            vmm.alloc_page(start_addr + (i * Size4KiB::SIZE), heap::PAGE_FLAGS)
-                .map_err(|_| ())?;
-        }
+        alloc_range(start_addr, size_to_map, heap::PAGE_FLAGS).map_err(|_| ())?;
 
         unsafe {
             talc.claim(Span::from_base_size(
