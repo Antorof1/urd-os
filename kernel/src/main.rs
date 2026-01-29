@@ -72,6 +72,13 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         task_executor.run();
     }));
 
+    thread::spawn(Thread::new(|| {
+        loop {
+            print!(":");
+            task::block_on(timer::sleep(Duration::from_millis(100)));
+        }
+    }));
+
     scheduler::run();
 }
 
