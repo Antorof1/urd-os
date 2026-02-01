@@ -9,7 +9,7 @@ use x86_64::{
 
 use crate::memory::{allocator::ALLOCATOR, boot_frame::BootFrameAllocator};
 
-const HEAP_START: VirtAddr = VirtAddr::new(0x7777_7777_0000);
+const HEAP_START: VirtAddr = VirtAddr::new(0xFFFF_A000_0000_0000);
 pub const MIN_HEAP_GROW: u64 = 64 * 1024;
 
 pub static HEAP_TOP: AtomicU64 = AtomicU64::new(HEAP_START.as_u64());

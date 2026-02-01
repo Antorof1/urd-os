@@ -30,7 +30,8 @@ use crate::{
 
 static BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
-    config.mappings.physical_memory = Some(Mapping::Dynamic);
+    config.mappings.physical_memory = Some(Mapping::FixedAddress(0xFFFF_8000_0000_0000));
+    config.mappings.kernel_base = Mapping::FixedAddress(0xFFFF_FFFF_8000_0000);
     config
 };
 
