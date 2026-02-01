@@ -14,7 +14,9 @@ pub const MIN_HEAP_GROW: u64 = 64 * 1024;
 
 pub static HEAP_TOP: AtomicU64 = AtomicU64::new(HEAP_START.as_u64());
 
-pub const PAGE_FLAGS: PageTableFlags = PageTableFlags::PRESENT.union(PageTableFlags::WRITABLE);
+pub const PAGE_FLAGS: PageTableFlags = PageTableFlags::PRESENT
+    .union(PageTableFlags::WRITABLE)
+    .union(PageTableFlags::NO_EXECUTE);
 
 pub fn init_boot(
     frame_allocator: &mut BootFrameAllocator,
