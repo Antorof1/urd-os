@@ -10,9 +10,9 @@ pub mod gdt;
 pub mod interrupts;
 pub mod memory;
 pub mod pit;
+pub mod process;
 pub mod sync;
 pub mod task;
-pub mod thread;
 
 use bootloader_api::{BootInfo, BootloaderConfig, config::Mapping, entry_point};
 use core::{panic::PanicInfo, time::Duration};
@@ -24,8 +24,11 @@ use crate::{
         frame::{StackFrameAllocator, initial_heap_size},
         heap, paging, vmm,
     },
+    process::{
+        scheduler,
+        thread::{self, Thread},
+    },
     task::{Task, executor::Executor, timer},
-    thread::{Thread, scheduler},
 };
 
 static BOOTLOADER_CONFIG: BootloaderConfig = {

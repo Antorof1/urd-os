@@ -9,7 +9,7 @@ use x86_64::{
     structures::paging::{PageSize, Size4KiB},
 };
 
-use crate::thread::{self, context::Context, stack::Stack};
+use crate::process::{context::Context, thread, thread::stack::Stack};
 
 pub struct Thread {
     id: ThreadId,

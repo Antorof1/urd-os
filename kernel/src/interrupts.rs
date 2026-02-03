@@ -5,12 +5,7 @@ use x86_64::{
     structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
 };
 
-use crate::{
-    gdt::DOUBLE_FAULT_IST_INDEX,
-    println,
-    task::timer::on_timer_tick,
-    thread::{self},
-};
+use crate::{gdt::DOUBLE_FAULT_IST_INDEX, println, process, task::timer::on_timer_tick};
 
 const PIC_MASTER_OFFSET: u8 = 32;
 const PIC_SLAVE_OFFSET: u8 = PIC_MASTER_OFFSET + 8;
@@ -112,6 +107,6 @@ extern "x86-interrupt" fn timer_handler(_stack_frame: InterruptStackFrame) {
 
     // 250 Hz
     if current_tick % 4 == 0 {
-        thread::schedule();
+        process::schedule();
     }
 }

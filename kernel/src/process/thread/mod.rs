@@ -1,21 +1,9 @@
-pub mod context;
-pub mod scheduler;
 pub mod stack;
 pub mod thread;
 
-pub use thread::{Thread, ThreadId};
+pub use thread::{Thread, ThreadId, ThreadState};
 
-use crate::thread::{context::switch_context, scheduler::scheduler};
-
-pub fn schedule() {
-    let stack_ptrs = scheduler().try_lock(|s| s.schedule()).flatten();
-
-    if let Some((current_stack_ptr, next_stack)) = stack_ptrs {
-        unsafe {
-            switch_context(current_stack_ptr, next_stack);
-        }
-    }
-}
+use crate::process::scheduler::scheduler;
 
 pub fn spawn(thread: Thread) {
     scheduler().lock(|s| s.spawn(thread));

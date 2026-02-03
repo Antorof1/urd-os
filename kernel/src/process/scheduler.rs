@@ -4,12 +4,11 @@ use spin::Once;
 use x86_64::VirtAddr;
 
 use crate::{
-    sync::IrqLock,
-    thread::{
-        Thread, ThreadId,
+    process::{
         context::{switch_context, switch_to_context},
-        thread::ThreadState,
+        thread::{Thread, ThreadId, ThreadState},
     },
+    sync::IrqLock,
 };
 
 static SCHEDULER: Once<IrqLock<Scheduler>> = Once::new();
