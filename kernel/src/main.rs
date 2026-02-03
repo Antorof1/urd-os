@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(abi_x86_interrupt)]
+#![feature(unsafe_cell_access)]
 
 extern crate alloc;
 
@@ -26,9 +27,9 @@ use crate::{
     },
     process::{
         scheduler,
-        thread::{self, Thread},
+        thread::{self},
     },
-    task::{Task, executor::Executor, timer},
+    task::timer,
 };
 
 static BOOTLOADER_CONFIG: BootloaderConfig = {
@@ -62,27 +63,14 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     let frame_allocator = StackFrameAllocator::new(frame_count, boot_frame_allocator);
 
     vmm::init(page_mapper, frame_allocator);
-    scheduler::init();
+    process::init();
 
-    thread::spawn(Thread::new(|| {
-        let mut task_executor = Executor::new();
-
-        task_executor.spawn(Task::new(async {
-            loop {
-                print!(".");
-                timer::sleep(Duration::from_millis(100)).await;
-            }
-        }));
-
-        task_executor.run();
-    }));
-
-    thread::spawn(Thread::new(|| {
+    process::spawn(|| {
         loop {
             print!(":");
             task::block_on(timer::sleep(Duration::from_millis(100)));
         }
-    }));
+    });
 
     scheduler::run();
 }

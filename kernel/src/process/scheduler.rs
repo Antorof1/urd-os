@@ -1,4 +1,4 @@
-use alloc::collections::btree_map::BTreeMap;
+use alloc::{collections::btree_map::BTreeMap, sync::Arc};
 use crossbeam_queue::ArrayQueue;
 use spin::Once;
 use x86_64::VirtAddr;
@@ -17,8 +17,8 @@ pub(super) fn scheduler() -> &'static IrqLock<Scheduler> {
     SCHEDULER.get().expect("Scheduler called before init()")
 }
 
-pub fn init() {
-    SCHEDULER.call_once(|| IrqLock::new(Scheduler::new()));
+pub(super) fn init(idle_thread: Arc<Thread>) {
+    SCHEDULER.call_once(|| IrqLock::new(Scheduler::new(idle_thread)));
 }
 
 pub fn run() -> ! {
@@ -26,7 +26,7 @@ pub fn run() -> ! {
 }
 
 pub struct Scheduler {
-    threads: BTreeMap<ThreadId, Thread>,
+    threads: BTreeMap<ThreadId, Arc<Thread>>,
     thread_queue: ArrayQueue<ThreadId>,
     dead_threads: ArrayQueue<ThreadId>,
     current_thread_id: Option<ThreadId>,
@@ -34,20 +34,15 @@ pub struct Scheduler {
 }
 
 impl Scheduler {
-    pub fn new() -> Self {
-        let idle_thread = Thread::new_idle();
+    pub fn new(idle_thread: Arc<Thread>) -> Self {
         let idle_thread_id = idle_thread.id();
 
-        let mut threads = BTreeMap::new();
-
-        threads.insert(idle_thread_id, idle_thread);
-
         Self {
-            threads,
+            threads: BTreeMap::new(),
             thread_queue: ArrayQueue::new(1024),
             dead_threads: ArrayQueue::new(1024),
             current_thread_id: None,
-            idle_thread_id: idle_thread_id,
+            idle_thread_id,
         }
     }
 
@@ -67,7 +62,7 @@ impl Scheduler {
         unreachable!()
     }
 
-    pub fn spawn(&mut self, mut thread: Thread) {
+    pub fn spawn(&mut self, thread: Arc<Thread>) {
         let thread_id = thread.id();
 
         thread.set_ready();
@@ -97,7 +92,7 @@ impl Scheduler {
         }
 
         unsafe {
-            let threads_ptr = &mut self.threads as *mut BTreeMap<ThreadId, Thread>;
+            let threads_ptr = &mut self.threads as *mut BTreeMap<ThreadId, Arc<Thread>>;
 
             let current_thread = (*threads_ptr).get_mut(&current_id).unwrap();
             let next_thread = (*threads_ptr).get_mut(&next_id).unwrap();
@@ -163,7 +158,7 @@ impl Scheduler {
         let next_id = self.next_thread_id();
 
         unsafe {
-            let threads_ptr = &mut self.threads as *mut BTreeMap<ThreadId, Thread>;
+            let threads_ptr = &mut self.threads as *mut BTreeMap<ThreadId, Arc<Thread>>;
 
             let current_thread = (*threads_ptr).get_mut(&current_id).unwrap();
             let next_thread = (*threads_ptr).get_mut(&next_id).unwrap();

@@ -1,11 +1,12 @@
 pub mod stack;
 pub mod thread;
 
+use alloc::sync::Arc;
 pub use thread::{Thread, ThreadId, ThreadState};
 
 use crate::process::scheduler::scheduler;
 
-pub fn spawn(thread: Thread) {
+pub fn spawn(thread: Arc<Thread>) {
     scheduler().lock(|s| s.spawn(thread));
 }
 

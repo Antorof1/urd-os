@@ -1,26 +1,36 @@
 use core::{
     arch::naked_asm,
+    cell::UnsafeCell,
     sync::atomic::{AtomicU64, Ordering},
 };
 
+use alloc::sync::{Arc, Weak};
 use x86_64::{
     VirtAddr,
     instructions::interrupts,
     structures::paging::{PageSize, Size4KiB},
 };
 
-use crate::process::{context::Context, thread, thread::stack::Stack};
+use crate::{
+    process::{
+        Process,
+        context::Context,
+        thread::{self, stack::Stack},
+    },
+    sync::IrqLock,
+};
 
 pub struct Thread {
     id: ThreadId,
-    state: ThreadState,
+    state: IrqLock<ThreadState>,
+    parent_process: Weak<Process>,
     #[allow(dead_code)]
     stack: Stack,
-    stack_ptr: VirtAddr,
+    stack_ptr: UnsafeCell<VirtAddr>,
 }
 
 impl Thread {
-    pub fn new(entry: fn()) -> Self {
+    pub fn new(parent_process: Weak<Process>, entry: fn()) -> Self {
         const STACK_SIZE: u64 = 16 * 1024;
         const STACK_REGION_START: u64 = 0xFFFF_B000_0000_0000;
 
@@ -46,15 +56,16 @@ impl Thread {
 
             Self {
                 id,
-                state: ThreadState::New,
+                state: IrqLock::new(ThreadState::New),
+                parent_process,
                 stack,
-                stack_ptr: stack_ptr,
+                stack_ptr: UnsafeCell::new(stack_ptr),
             }
         }
     }
 
-    pub fn new_idle() -> Self {
-        Self::new(|| {
+    pub fn new_idle(parent_process: Weak<Process>) -> Self {
+        Self::new(parent_process, || {
             interrupts::enable();
 
             loop {
@@ -67,34 +78,40 @@ impl Thread {
         self.id
     }
 
-    pub fn stack_ptr(&self) -> VirtAddr {
-        self.stack_ptr
+    pub fn parent_process(&self) -> Option<Arc<Process>> {
+        self.parent_process.upgrade()
     }
 
-    pub fn stack_ptr_mut(&mut self) -> &mut VirtAddr {
-        &mut self.stack_ptr
+    pub fn stack_ptr(&self) -> VirtAddr {
+        unsafe { *self.stack_ptr.get() }
+    }
+
+    pub fn stack_ptr_mut(&self) -> &mut VirtAddr {
+        unsafe { self.stack_ptr.as_mut_unchecked() }
     }
 
     pub fn state(&self) -> ThreadState {
-        self.state
+        self.state.lock(|state| state.clone())
     }
 
-    pub fn set_ready(&mut self) {
-        self.state = ThreadState::Ready;
+    pub fn set_ready(&self) {
+        self.state.lock(|state| *state = ThreadState::Ready);
     }
 
-    pub fn set_running(&mut self) {
-        self.state = ThreadState::Running;
+    pub fn set_running(&self) {
+        self.state.lock(|state| *state = ThreadState::Running);
     }
 
-    pub fn set_blocked(&mut self) {
-        self.state = ThreadState::Blocked;
+    pub fn set_blocked(&self) {
+        self.state.lock(|state| *state = ThreadState::Blocked);
     }
 
-    pub fn set_dead(&mut self) {
-        self.state = ThreadState::Dead;
+    pub fn set_dead(&self) {
+        self.state.lock(|state| *state = ThreadState::Dead);
     }
 }
+
+unsafe impl Sync for Thread {}
 
 #[unsafe(naked)]
 extern "C" fn entry_wrapper() -> ! {
