@@ -1,7 +1,10 @@
 use alloc::{collections::btree_map::BTreeMap, sync::Arc};
 
 use crate::{
-    process::{Process, ProcessId, thread},
+    process::{
+        Process, ProcessId,
+        thread::{self, Thread},
+    },
     sync::IrqLock,
 };
 
@@ -34,5 +37,16 @@ impl ProcessManager {
         });
 
         self.add_process(process);
+    }
+
+    pub fn spawn_thread(&mut self, id: ProcessId, entry: fn()) {
+        let process = self.processes.get(&id).expect("Process not found");
+
+        let thread = Thread::new(Arc::downgrade(process), entry);
+        let thread_arc = Arc::new(thread);
+
+        thread::spawn(Arc::clone(&thread_arc));
+
+        process.add_thread(thread_arc);
     }
 }

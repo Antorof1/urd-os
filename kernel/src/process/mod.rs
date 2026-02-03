@@ -36,7 +36,7 @@ pub fn init() {
         Process::new(idle_threada_arc)
     });
 
-    kernel_process.add_thread(|| {
+    kernel_process.add_new_thread(|| {
         let mut task_executor = Executor::new();
 
         task_executor.spawn(Task::new(async {
@@ -61,4 +61,14 @@ pub fn spawn(entry: fn()) {
     });
 
     PROCESS_MANAGER.lock(|pm| pm.spawn_process(process))
+}
+
+pub fn spawn_thread(entry: fn()) {
+    let current_id = current_id();
+
+    PROCESS_MANAGER.lock(|pm| pm.spawn_thread(current_id, entry));
+}
+
+pub fn current_id() -> ProcessId {
+    scheduler().lock(|s| s.current_process_id())
 }

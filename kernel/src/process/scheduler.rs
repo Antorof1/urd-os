@@ -5,6 +5,7 @@ use x86_64::VirtAddr;
 
 use crate::{
     process::{
+        ProcessId,
         context::{switch_context, switch_to_context},
         thread::{Thread, ThreadId, ThreadState},
     },
@@ -189,6 +190,15 @@ impl Scheduler {
     pub fn current_thread_id(&self) -> ThreadId {
         self.current_thread_id
             .expect("Scheduler called before run()")
+    }
+
+    pub fn current_process_id(&self) -> ProcessId {
+        let thread_id = self.current_thread_id();
+        let thread = self.threads.get(&thread_id).unwrap();
+
+        let process = thread.parent_process().expect("Process not found");
+
+        process.id()
     }
 
     fn next_thread_id(&mut self) -> ThreadId {
