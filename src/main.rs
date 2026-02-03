@@ -46,6 +46,8 @@ fn main() {
         cmd.arg("-display").arg("none");
     }
     
+    cmd.arg("-m").arg("4G");
+    
     // enable the guest to exit qemu
     cmd.arg("-device")
         .arg("isa-debug-exit,iobase=0xf4,iosize=0x04");
