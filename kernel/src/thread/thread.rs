@@ -3,31 +3,41 @@ use core::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use alloc::boxed::Box;
-use x86_64::{VirtAddr, instructions::interrupts};
+use x86_64::{
+    VirtAddr,
+    instructions::interrupts,
+    structures::paging::{PageSize, Size4KiB},
+};
 
-use crate::thread::{self, context::Context};
-
-const STACK_SIZE: usize = 16384;
+use crate::thread::{self, context::Context, stack::Stack};
 
 pub struct Thread {
     id: ThreadId,
     state: ThreadState,
-    stack: Box<[u8; STACK_SIZE]>, // map to real frames instead of kernel heap
+    #[allow(dead_code)]
+    stack: Stack,
     stack_ptr: VirtAddr,
 }
 
 impl Thread {
     pub fn new(entry: fn()) -> Self {
-        let mut stack = Box::new([0u8; STACK_SIZE]);
+        const STACK_SIZE: u64 = 16 * 1024;
+        const STACK_REGION_START: u64 = 0xFFFF_B000_0000_0000;
+
+        let id = ThreadId::new();
+
+        let stack_offset = id.as_u64() * (STACK_SIZE + Size4KiB::SIZE);
+        let stack_start_address = VirtAddr::new(STACK_REGION_START + stack_offset);
+
+        let stack =
+            Stack::new(stack_start_address, STACK_SIZE).expect("Failed to allocate stack pages");
 
         unsafe {
-            let stack_top = stack.as_mut_ptr().add(STACK_SIZE);
+            let stack_top = stack.top();
 
-            let context_size = size_of::<Context>();
-            let stack_ptr = stack_top.sub(context_size);
+            let stack_ptr = stack_top - size_of::<Context>() as u64;
 
-            let context_ptr = stack_ptr as *mut Context;
+            let context_ptr: *mut Context = stack_ptr.as_mut_ptr();
             core::ptr::write_bytes(context_ptr, 0, 1);
 
             let context = &mut *context_ptr;
@@ -35,10 +45,10 @@ impl Thread {
             context.r12 = entry as u64;
 
             Self {
-                id: ThreadId::new(),
+                id,
                 state: ThreadState::New,
                 stack,
-                stack_ptr: VirtAddr::from_ptr(stack_ptr),
+                stack_ptr: stack_ptr,
             }
         }
     }
