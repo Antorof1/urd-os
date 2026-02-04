@@ -9,6 +9,7 @@ const STACK_PAGE_FLAGS: PageTableFlags = PageTableFlags::PRESENT
     .union(PageTableFlags::WRITABLE)
     .union(PageTableFlags::NO_EXECUTE);
 
+#[derive(Debug)]
 pub struct Stack {
     bottom_address: VirtAddr,
     size: u64,

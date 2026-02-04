@@ -1,6 +1,7 @@
 use spin::Mutex;
 use x86_64::instructions::interrupts;
 
+#[derive(Debug)]
 pub struct IrqLock<T> {
     inner: Mutex<T>,
 }

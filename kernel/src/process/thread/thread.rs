@@ -20,6 +20,7 @@ use crate::{
     sync::IrqLock,
 };
 
+#[derive(Debug)]
 pub struct Thread {
     id: ThreadId,
     state: IrqLock<ThreadState>,

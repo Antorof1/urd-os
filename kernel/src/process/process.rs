@@ -4,6 +4,7 @@ use alloc::{sync::Arc, vec, vec::Vec};
 
 use crate::{process::thread::Thread, sync::IrqLock};
 
+#[derive(Debug)]
 pub struct Process {
     id: ProcessId,
     threads: IrqLock<Vec<Arc<Thread>>>,
