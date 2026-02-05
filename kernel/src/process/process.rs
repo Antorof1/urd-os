@@ -18,7 +18,7 @@ impl Process {
         }
     }
 
-    pub fn add_thread(self: &Arc<Self>, thread: Arc<Thread>) {
+    pub fn add_thread(&self, thread: Arc<Thread>) {
         self.threads.lock(|t| t.push(thread));
     }
 
