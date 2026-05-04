@@ -36,19 +36,6 @@ pub fn init() {
         Process::new(idle_threada_arc)
     });
 
-    kernel_process.add_new_thread(|| {
-        let mut task_executor = Executor::new();
-
-        task_executor.spawn(Task::new(async {
-            loop {
-                print!(".");
-                timer::sleep(Duration::from_millis(100)).await;
-            }
-        }));
-
-        task_executor.run();
-    });
-
     PROCESS_MANAGER.lock(|pm| pm.spawn_process(kernel_process));
 }
 
