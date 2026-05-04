@@ -4,17 +4,11 @@ pub mod process;
 pub mod scheduler;
 pub mod thread;
 
-use core::time::Duration;
-
 use alloc::sync::Arc;
 pub use process::{Process, ProcessId};
 
-use crate::{
-    print,
-    process::{
-        context::switch_context, manager::PROCESS_MANAGER, scheduler::scheduler, thread::Thread,
-    },
-    task::{Task, executor::Executor, timer},
+use crate::process::{
+    context::switch_context, manager::PROCESS_MANAGER, scheduler::scheduler, thread::Thread,
 };
 
 pub fn schedule() {
@@ -39,7 +33,10 @@ pub fn init() {
     PROCESS_MANAGER.lock(|pm| pm.spawn_process(kernel_process));
 }
 
-pub fn spawn(entry: fn()) {
+pub fn spawn<F>(entry: F)
+where
+    F: FnOnce() + Send + 'static,
+{
     let process = Arc::new_cyclic(|process| {
         let thread = Thread::new(process.clone(), entry);
         let thread_arc = Arc::new(thread);
@@ -50,7 +47,10 @@ pub fn spawn(entry: fn()) {
     PROCESS_MANAGER.lock(|pm| pm.spawn_process(process))
 }
 
-pub fn spawn_thread(entry: fn()) {
+pub fn spawn_thread<F>(entry: F)
+where
+    F: FnOnce() + Send + 'static,
+{
     let current_id = current_id();
 
     PROCESS_MANAGER.lock(|pm| pm.spawn_thread(current_id, entry));

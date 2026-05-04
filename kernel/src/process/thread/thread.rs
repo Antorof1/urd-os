@@ -4,7 +4,10 @@ use core::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use alloc::sync::{Arc, Weak};
+use alloc::{
+    boxed::Box,
+    sync::{Arc, Weak},
+};
 use x86_64::{
     VirtAddr,
     instructions::interrupts,
@@ -31,7 +34,10 @@ pub struct Thread {
 }
 
 impl Thread {
-    pub fn new(parent_process: Weak<Process>, entry: fn()) -> Self {
+    pub fn new<F>(parent_process: Weak<Process>, entry: F) -> Self
+    where
+        F: FnOnce() + Send + 'static,
+    {
         const STACK_SIZE: u64 = 16 * 1024;
         const STACK_REGION_START: u64 = 0xFFFF_B000_0000_0000;
 
@@ -43,6 +49,8 @@ impl Thread {
         let stack =
             Stack::new(stack_start_address, STACK_SIZE).expect("Failed to allocate stack pages");
 
+        let closure = Box::into_raw(Box::new(entry));
+
         unsafe {
             let stack_top = stack.top();
 
@@ -53,7 +61,8 @@ impl Thread {
 
             let context = &mut *context_ptr;
             context.rip = entry_wrapper as *const () as u64;
-            context.r12 = entry as u64;
+            context.r12 = thread_trampoline::<F> as *const () as u64;
+            context.r13 = closure as u64;
 
             Self {
                 id,
@@ -114,9 +123,18 @@ impl Thread {
 
 unsafe impl Sync for Thread {}
 
+extern "C" fn thread_trampoline<F>(closure_ptr: u64)
+where
+    F: FnOnce() + Send + 'static,
+{
+    let closure = unsafe { Box::from_raw(closure_ptr as *mut F) };
+
+    closure();
+}
+
 #[unsafe(naked)]
 extern "C" fn entry_wrapper() -> ! {
-    naked_asm!("sti", "call r12", "call {thread_exit}", thread_exit = sym thread::exit);
+    naked_asm!("sti", "mov rdi, r13", "call r12", "call {thread_exit}", thread_exit = sym thread::exit);
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]

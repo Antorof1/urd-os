@@ -39,7 +39,10 @@ impl ProcessManager {
         self.add_process(process);
     }
 
-    pub fn spawn_thread(&mut self, id: ProcessId, entry: fn()) {
+    pub fn spawn_thread<F>(&mut self, id: ProcessId, entry: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
         let process = self.processes.get(&id).expect("Process not found");
 
         let thread = Thread::new(Arc::downgrade(process), entry);

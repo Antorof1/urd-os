@@ -66,10 +66,10 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     process::init();
 
     process::spawn(|| {
-        for _ in 0..10 {
-            process::spawn_thread(|| {
+        for i in 0..10 {
+            process::spawn_thread(move || {
                 task::block_on(timer::sleep(Duration::from_millis(500)));
-                println!("hello");
+                println!("hello {i}");
             });
         }
     });
