@@ -2,7 +2,10 @@ use core::sync::atomic::{AtomicU64, Ordering};
 
 use alloc::{sync::Arc, vec, vec::Vec};
 
-use crate::{process::thread::Thread, sync::IrqLock};
+use crate::{
+    process::thread::{Thread, ThreadId},
+    sync::IrqLock,
+};
 
 #[derive(Debug)]
 pub struct Process {
@@ -26,6 +29,16 @@ impl Process {
         let thread = Arc::new(Thread::new(Arc::downgrade(self), entry));
 
         self.threads.lock(|t| t.push(thread));
+    }
+
+    pub fn remove_thread(&self, id: ThreadId) -> bool {
+        self.threads.lock(|threads| {
+            if let Some(index) = threads.iter().position(|t| t.id() == id) {
+                threads.swap_remove(index);
+            }
+
+            threads.is_empty()
+        })
     }
 
     pub fn id(&self) -> ProcessId {

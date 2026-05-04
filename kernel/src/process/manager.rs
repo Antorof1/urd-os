@@ -49,4 +49,8 @@ impl ProcessManager {
 
         process.add_thread(thread_arc);
     }
+
+    pub fn remove_process(&mut self, id: ProcessId) {
+        self.processes.remove(&id).expect("Process not found");
+    }
 }

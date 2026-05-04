@@ -202,6 +202,12 @@ impl Scheduler {
         process.id()
     }
 
+    pub fn current_thread(&self) -> Arc<Thread> {
+        let id = self.current_thread_id();
+
+        self.threads.get(&id).expect("Thread not found").clone()
+    }
+
     fn next_thread_id(&mut self) -> ThreadId {
         while let Some(id) = self.thread_queue.pop() {
             let thread = self.threads.get(&id).unwrap();

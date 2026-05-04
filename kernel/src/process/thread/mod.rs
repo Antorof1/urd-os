@@ -4,13 +4,21 @@ pub mod thread;
 use alloc::sync::Arc;
 pub use thread::{Thread, ThreadId, ThreadState};
 
-use crate::process::scheduler::scheduler;
+use crate::process::{manager::PROCESS_MANAGER, scheduler::scheduler};
 
 pub fn spawn(thread: Arc<Thread>) {
     scheduler().lock(|s| s.spawn(thread));
 }
 
 pub fn exit() -> ! {
+    let current_thread = scheduler().lock(|s| s.current_thread());
+
+    if let Some(process) = current_thread.parent_process() {
+        if process.remove_thread(current_thread.id()) {
+            PROCESS_MANAGER.lock(|pm| pm.remove_process(process.id()));
+        }
+    }
+
     scheduler().lock(|s| s.exit_current_thread())
 }
 
