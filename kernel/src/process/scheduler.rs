@@ -138,6 +138,7 @@ impl Scheduler {
         self.current_thread_id = Some(next_id);
 
         let next_thread = self.threads.get(&next_id).unwrap();
+        next_thread.set_running();
 
         unsafe {
             scheduler().force_unlock();
