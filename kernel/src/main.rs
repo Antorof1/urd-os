@@ -17,13 +17,14 @@ pub mod task;
 
 use bootloader_api::{BootInfo, BootloaderConfig, config::Mapping, entry_point};
 use core::{panic::PanicInfo, time::Duration};
-use x86_64::VirtAddr;
+use x86_64::{VirtAddr, structures::paging::Translate};
 
 use crate::{
     memory::{
         boot_frame::BootFrameAllocator,
         frame::{StackFrameAllocator, initial_heap_size},
-        heap, paging, vmm,
+        heap, paging,
+        vmm::{self},
     },
     process::{
         scheduler,
@@ -42,18 +43,26 @@ static BOOTLOADER_CONFIG: BootloaderConfig = {
 entry_point!(kernel_main, config = &BOOTLOADER_CONFIG);
 
 fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
+    let phys_offset = VirtAddr::new(boot_info.physical_memory_offset.take().unwrap());
+    let mut page_mapper = unsafe { paging::active_mapper(phys_offset) };
+
     if let Some(fb_struct) = boot_info.framebuffer.as_mut() {
-        display::init(fb_struct.info(), fb_struct.buffer_mut());
+        let fb_init_virt = VirtAddr::new(fb_struct.buffer().as_ptr() as u64);
+        let fb_phys = page_mapper.translate_addr(fb_init_virt).unwrap();
+        let fb_offset_virt = fb_phys.as_u64() + phys_offset.as_u64();
+
+        let buffer = unsafe {
+            core::slice::from_raw_parts_mut(fb_offset_virt as *mut u8, fb_struct.buffer().len())
+        };
+
+        display::init(fb_struct.info(), buffer);
     }
 
     pit::init();
     gdt::init();
     interrupts::init();
 
-    let phys_offset = VirtAddr::new(boot_info.physical_memory_offset.take().unwrap());
-
     let mut boot_frame_allocator = BootFrameAllocator::new(&boot_info.memory_regions);
-    let mut page_mapper = unsafe { paging::active_mapper(phys_offset) };
 
     let frame_count = boot_frame_allocator.frame_count();
     let heap_size = initial_heap_size(frame_count);
