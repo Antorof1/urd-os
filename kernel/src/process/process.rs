@@ -3,7 +3,11 @@ use core::sync::atomic::{AtomicU64, Ordering};
 use alloc::{sync::Arc, vec, vec::Vec};
 
 use crate::{
-    process::thread::{Thread, ThreadId},
+    memory::vmm::vmm,
+    process::{
+        address_space::ProcessAddressSpace,
+        thread::{Thread, ThreadId},
+    },
     sync::IrqLock,
 };
 
@@ -11,13 +15,25 @@ use crate::{
 pub struct Process {
     id: ProcessId,
     threads: IrqLock<Vec<Arc<Thread>>>,
+    address_space: ProcessAddressSpace,
 }
 
 impl Process {
     pub fn new(thread: Arc<Thread>) -> Self {
+        let address_space = vmm().lock(|vmm| ProcessAddressSpace::new(vmm).expect("Out of memory"));
+
         Self {
             id: ProcessId::new(),
             threads: IrqLock::new(vec![thread]),
+            address_space,
+        }
+    }
+
+    pub fn new_kernel(thread: Arc<Thread>) -> Self {
+        Self {
+            id: ProcessId::new(),
+            threads: IrqLock::new(vec![thread]),
+            address_space: ProcessAddressSpace::from_current(),
         }
     }
 
@@ -43,6 +59,10 @@ impl Process {
 
     pub fn id(&self) -> ProcessId {
         self.id
+    }
+
+    pub fn cr3_value(&self) -> u64 {
+        self.address_space.cr3_value()
     }
 
     pub fn with_threads<F, R>(&self, f: F) -> R

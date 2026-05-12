@@ -1,3 +1,4 @@
+pub mod address_space;
 pub mod context;
 pub mod manager;
 pub mod process;
@@ -12,11 +13,11 @@ use crate::process::{
 };
 
 pub fn schedule() {
-    let stack_ptrs = scheduler().try_lock(|s| s.schedule()).flatten();
+    let context_data = scheduler().try_lock(|s| s.schedule()).flatten();
 
-    if let Some((current_stack_ptr, next_stack)) = stack_ptrs {
+    if let Some((current_stack_ptr, next_stack, next_cr3)) = context_data {
         unsafe {
-            switch_context(current_stack_ptr, next_stack);
+            switch_context(current_stack_ptr, next_stack, next_cr3);
         }
     }
 }
@@ -27,7 +28,7 @@ pub fn init() {
         let idle_threada_arc = Arc::new(idle_thread);
 
         scheduler::init(Arc::clone(&idle_threada_arc));
-        Process::new(idle_threada_arc)
+        Process::new_kernel(idle_threada_arc)
     });
 
     PROCESS_MANAGER.lock(|pm| pm.spawn_process(kernel_process));

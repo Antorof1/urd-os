@@ -53,11 +53,20 @@ pub unsafe extern "C" fn switch_to_context(target_stack: VirtAddr) {
 }
 
 #[unsafe(naked)]
-pub unsafe extern "C" fn switch_context(current_stack_ptr: *mut VirtAddr, next_stack: VirtAddr) {
+pub unsafe extern "C" fn switch_context(
+    current_stack_ptr: *mut VirtAddr,
+    next_stack: VirtAddr,
+    next_cr3: u64,
+) {
     naked_asm!(
         save_context!(),
         "mov [rdi], rsp",
         "mov rsp, rsi",
+        "mov rax, cr3",
+        "cmp rax, rdx", // Compare current cr3 with next_cr3
+        "je 1f",
+        "mov cr3, rdx",
+        "1:",
         restore_context!(),
         "ret"
     );

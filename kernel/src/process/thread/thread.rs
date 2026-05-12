@@ -100,6 +100,10 @@ impl Thread {
         unsafe { self.stack_ptr.as_mut_unchecked() }
     }
 
+    pub fn cr3_value(&self) -> u64 {
+        self.parent_process().unwrap().cr3_value()
+    }
+
     pub fn state(&self) -> ThreadState {
         self.state.lock(|state| state.clone())
     }

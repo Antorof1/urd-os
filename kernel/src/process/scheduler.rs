@@ -77,7 +77,7 @@ impl Scheduler {
             .expect("Scheduler queue is full");
     }
 
-    pub fn schedule(&mut self) -> Option<(*mut VirtAddr, VirtAddr)> {
+    pub fn schedule(&mut self) -> Option<(*mut VirtAddr, VirtAddr, u64)> {
         while let Some(id) = self.dead_threads.pop() {
             self.threads.remove(&id).unwrap();
         }
@@ -113,7 +113,13 @@ impl Scheduler {
 
             self.current_thread_id = Some(next_id);
 
-            Some((current_thread.stack_ptr_mut(), next_thread.stack_ptr()))
+            let next_cr3 = next_thread.cr3_value();
+
+            Some((
+                current_thread.stack_ptr_mut(),
+                next_thread.stack_ptr(),
+                next_cr3,
+            ))
         }
     }
 
@@ -170,9 +176,15 @@ impl Scheduler {
 
             self.current_thread_id = Some(next_id);
 
+            let next_cr3 = next_thread.cr3_value();
+
             scheduler().force_unlock();
 
-            switch_context(current_thread.stack_ptr_mut(), next_thread.stack_ptr());
+            switch_context(
+                current_thread.stack_ptr_mut(),
+                next_thread.stack_ptr(),
+                next_cr3,
+            );
         }
     }
 
