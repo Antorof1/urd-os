@@ -153,4 +153,8 @@ impl VirtualMemoryManager {
     pub fn dealloc_frame(&mut self, frame: PhysFrame<Size4KiB>) {
         unsafe { self.frame_allocator.deallocate_frame(frame) };
     }
+
+    pub fn phys_to_virt(&self, phys: PhysAddr) -> VirtAddr {
+        VirtAddr::new(phys.as_u64() + self.mapper.phys_offset().as_u64())
+    }
 }
