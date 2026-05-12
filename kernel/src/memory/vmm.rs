@@ -1,8 +1,9 @@
 use spin::Once;
 use x86_64::{
-    VirtAddr,
+    PhysAddr, VirtAddr,
     structures::paging::{
-        FrameAllocator, FrameDeallocator, Mapper, OffsetPageTable, Page, PageTableFlags, Size4KiB,
+        FrameAllocator, FrameDeallocator, Mapper, OffsetPageTable, Page, PageTableFlags, PhysFrame,
+        Size4KiB,
         mapper::{MapToError, UnmapError},
     },
 };
@@ -114,6 +115,10 @@ impl VirtualMemoryManager {
         Ok(())
     }
 
+    pub fn alloc_frame(&mut self) -> Option<PhysFrame<Size4KiB>> {
+        self.frame_allocator.allocate_frame()
+    }
+
     pub fn dealloc_page(&mut self, address: VirtAddr) -> Result<(), UnmapError> {
         let page = Page::<Size4KiB>::containing_address(address);
 
@@ -143,5 +148,9 @@ impl VirtualMemoryManager {
         }
 
         Ok(())
+    }
+
+    pub fn dealloc_frame(&mut self, frame: PhysFrame<Size4KiB>) {
+        unsafe { self.frame_allocator.deallocate_frame(frame) };
     }
 }
