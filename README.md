@@ -1,8 +1,8 @@
 # Urd OS
 
 [![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org/)
-[![Platform](https://img.shields.io/badge/platform-x86__64-lightgrey.svg)]()
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)]()
+[![Platform](https://img.shields.io/badge/platform-x86__64-lightgrey.svg)](https://en.wikipedia.org/wiki/X86-64)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/license/mit)
 
 Urd OS is a hobby operating system written in Rust for the `x86_64` architecture. It aims to explore modern OS design patterns using Rust's safety and concurrency features.
 
